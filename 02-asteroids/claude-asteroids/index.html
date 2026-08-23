@@ -13,14 +13,76 @@
       justify-content: center;
       height: 100vh;
     }
+    .board-wrap {
+      position: relative;
+    }
     canvas {
       display: block;
       border: 1px solid #222;
     }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+    }
+    .overlay.hidden {
+      display: none;
+    }
+    .overlay-box {
+      text-align: center;
+      font-family: monospace;
+      color: #fff;
+    }
+    #overlay-title {
+      font-size: 32px;
+      font-weight: bold;
+      letter-spacing: 6px;
+      margin-bottom: 20px;
+    }
+    .overlay-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .overlay-actions button {
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 22px;
+      font-size: 13px;
+      font-weight: bold;
+      font-family: monospace;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .overlay-actions button:hover {
+      opacity: 0.8;
+    }
+    #restart-btn {
+      background: transparent;
+      color: #fff;
+      border: 1px solid #666;
+    }
   </style>
 </head>
 <body>
-  <canvas id="canvas" width="800" height="600"></canvas>
+  <div class="board-wrap">
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div id="overlay" class="overlay hidden">
+      <div class="overlay-box">
+        <p id="overlay-title">PAUSA</p>
+        <div class="overlay-actions">
+          <button id="continue-btn">Continuar</button>
+          <button id="restart-btn">Reiniciar</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <script src="game.js"></script>
 </body>
 </html>

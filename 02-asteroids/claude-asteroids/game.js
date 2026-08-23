@@ -5,6 +5,10 @@ const ctx = canvas.getContext('2d');
 const W = 800;
 const H = 600;
 
+const overlay = document.getElementById('overlay');
+const continueBtn = document.getElementById('continue-btn');
+const restartBtn = document.getElementById('restart-btn');
+
 // ── Input ─────────────────────────────────────────────────────────────────────
 const keys = {};
 const justPressed = {};
@@ -345,6 +349,7 @@ let ship, bullets, asteroids, particles, powerups;
 let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
+let paused = false;
 let powerupSpawnedThisLevel; // true si el power-up ya apareció en el nivel actual (una vez por nivel)
 
 function spawnAsteroids(count) {
@@ -398,8 +403,17 @@ function killShip() {
   }
 }
 
+function togglePause() {
+  if (state === 'gameover') return;
+  paused = !paused;
+  overlay.classList.toggle('hidden', !paused);
+}
+
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
+  if (pressed('KeyP')) togglePause();
+  if (paused) return;
+
   if (state === 'gameover') {
     if (pressed('Space')) initGame();
     particles.forEach(p => p.update(dt));
@@ -529,6 +543,10 @@ function drawHUD() {
     drawLifeIcon(W - 16 - i * 22, 18);
 
   ctx.textAlign = 'left';
+  ctx.font = '12px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText('P: PAUSA', 14, H - 12);
+
   ctx.font = '13px monospace';
   let statusY = 46;
   if (ship.tripleShotTimer > 0) {
@@ -583,6 +601,13 @@ function loop(ts) {
   draw();
   requestAnimationFrame(loop);
 }
+
+continueBtn.addEventListener('click', () => { if (paused) togglePause(); });
+restartBtn.addEventListener('click', () => {
+  paused = false;
+  overlay.classList.add('hidden');
+  initGame();
+});
 
 initGame();
 requestAnimationFrame(loop);
