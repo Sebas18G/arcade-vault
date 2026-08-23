@@ -90,6 +90,7 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const continueBtn = document.getElementById('continue-btn');
 const themeSwitch = document.getElementById('theme-switch');
 const nextLabelEl = document.getElementById('next-label');
 const powerupToastEl = document.getElementById('powerup-toast');
@@ -568,6 +569,7 @@ function endGame() {
   cancelAnimationFrame(animId);
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+  continueBtn.hidden = true;
   overlay.classList.remove('hidden');
 }
 
@@ -575,12 +577,14 @@ function togglePause() {
   if (gameOver) return;
   paused = !paused;
   if (!paused) {
+    overlay.classList.add('hidden');
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
     overlayTitle.textContent = 'PAUSA';
     overlayScore.textContent = '';
+    continueBtn.hidden = false;
     overlay.classList.remove('hidden');
   }
 }
@@ -677,6 +681,7 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+continueBtn.addEventListener('click', () => { if (paused) togglePause(); });
 
 function applyTheme(theme) {
   document.body.classList.toggle('light-theme', theme === 'light');
