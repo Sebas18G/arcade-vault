@@ -99,9 +99,15 @@ const freezeStatusEl = document.getElementById('freeze-status');
 const comboStatusSection = document.getElementById('combo-status-section');
 const comboStatusEl = document.getElementById('combo-status');
 const comboToastEl = document.getElementById('combo-toast');
+const pauseMenu = document.getElementById('pause-menu');
+const startLevelSelect = document.getElementById('start-level-select');
+const controlsToggleBtn = document.getElementById('controls-toggle-btn');
+const pauseControlsList = document.getElementById('pause-controls-list');
 
 const THEME_KEY = 'tetris-theme';
+const START_LEVEL_KEY = 'tetris-start-level';
 let gridColor = '#22222e';
+let startLevel = 1;
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let linesSincePowerUp, powerUpThreshold, lastPowerUpType, freezeRemaining, toastTimeoutId;
@@ -128,6 +134,10 @@ function weightedRandomType() {
 
 function randomPiece() {
   return createPiece(weightedRandomType());
+}
+
+function dropIntervalForLevel(lvl) {
+  return Math.max(100, 1000 - (lvl - 1) * 90);
 }
 
 function rollPowerUpThreshold(lvl) {
@@ -241,8 +251,8 @@ function clearLines(isTSpin) {
     score += (PERFECT_CLEAR_SCORES[cleared] || PERFECT_CLEAR_SCORES[4]) * level;
   }
 
-  level = Math.floor(lines / 10) + 1;
-  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  level = startLevel + Math.floor(lines / 10);
+  dropInterval = dropIntervalForLevel(level);
   linesSincePowerUp += cleared;
 
   if (cleared === 4) {
@@ -570,6 +580,7 @@ function endGame() {
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
   continueBtn.hidden = true;
+  pauseMenu.classList.add('hidden');
   overlay.classList.remove('hidden');
 }
 
@@ -578,6 +589,7 @@ function togglePause() {
   paused = !paused;
   if (!paused) {
     overlay.classList.add('hidden');
+    pauseMenu.classList.add('hidden');
     lastTime = performance.now();
     loop(lastTime);
   } else {
@@ -585,6 +597,9 @@ function togglePause() {
     overlayTitle.textContent = 'PAUSA';
     overlayScore.textContent = '';
     continueBtn.hidden = false;
+    pauseMenu.classList.remove('hidden');
+    pauseControlsList.classList.add('hidden');
+    controlsToggleBtn.textContent = 'Ver controles ▾';
     overlay.classList.remove('hidden');
   }
 }
@@ -624,10 +639,10 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  level = startLevel;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = dropIntervalForLevel(level);
   dropAccum = 0;
   lastTime = performance.now();
   linesSincePowerUp = 0;
@@ -656,7 +671,7 @@ function init() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
@@ -683,6 +698,22 @@ document.addEventListener('keydown', e => {
 restartBtn.addEventListener('click', init);
 continueBtn.addEventListener('click', () => { if (paused) togglePause(); });
 
+controlsToggleBtn.addEventListener('click', () => {
+  const isHidden = pauseControlsList.classList.toggle('hidden');
+  controlsToggleBtn.textContent = isHidden ? 'Ver controles ▾' : 'Ocultar controles ▴';
+});
+
+function applyStartLevel(lvl) {
+  startLevel = lvl;
+  startLevelSelect.value = String(lvl);
+}
+
+startLevelSelect.addEventListener('change', () => {
+  const lvl = parseInt(startLevelSelect.value, 10);
+  applyStartLevel(lvl);
+  localStorage.setItem(START_LEVEL_KEY, String(lvl));
+});
+
 function applyTheme(theme) {
   document.body.classList.toggle('light-theme', theme === 'light');
   themeSwitch.checked = theme === 'light';
@@ -696,5 +727,8 @@ themeSwitch.addEventListener('change', () => {
 });
 
 applyTheme(localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark');
+
+const storedStartLevel = parseInt(localStorage.getItem(START_LEVEL_KEY), 10);
+applyStartLevel(Number.isInteger(storedStartLevel) && storedStartLevel >= 1 && storedStartLevel <= 10 ? storedStartLevel : 1);
 
 init();
