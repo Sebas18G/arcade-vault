@@ -350,7 +350,13 @@ let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
 let paused = false;
-let powerupSpawnedThisLevel; // true si el power-up ya apareció en el nivel actual (una vez por nivel)
+let powerupsSpawnedThisLevel; // cuántos power-ups han salido ya en el nivel actual
+let maxPowerupsThisLevel;     // tope de power-ups para el nivel actual (escala con la dificultad)
+
+// A más nivel, más power-ups pueden aparecer: sube 1 cada 3 niveles, con un tope de 5.
+function computeMaxPowerups(lvl) {
+  return Math.min(1 + Math.floor((lvl - 1) / 3), 5);
+}
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -374,7 +380,8 @@ function initGame() {
   lives  = 3;
   level  = 1;
   state  = 'playing';
-  powerupSpawnedThisLevel = false;
+  powerupsSpawnedThisLevel = 0;
+  maxPowerupsThisLevel     = computeMaxPowerups(level);
   spawnAsteroids(4);
 }
 
@@ -383,7 +390,8 @@ function nextLevel() {
   bullets   = [];
   particles = [];
   ship.reset();
-  powerupSpawnedThisLevel = false;
+  powerupsSpawnedThisLevel = 0;
+  maxPowerupsThisLevel     = computeMaxPowerups(level);
   spawnAsteroids(3 + level);
 }
 
@@ -461,9 +469,9 @@ function update(dt) {
         newAsteroids.push(...a.split());
         lastKillPos = { x: a.x, y: a.y };
 
-        if (!powerupSpawnedThisLevel && Math.random() < POWERUP_CHANCE) {
+        if (powerupsSpawnedThisLevel < maxPowerupsThisLevel && Math.random() < POWERUP_CHANCE) {
           powerups.push(new PowerUp(a.x, a.y, randomPowerUpType()));
-          powerupSpawnedThisLevel = true;
+          powerupsSpawnedThisLevel++;
         }
       }
     }
@@ -471,10 +479,10 @@ function update(dt) {
   asteroids = asteroids.filter(a => !a.dead).concat(newAsteroids);
   bullets   = bullets.filter(b => !b.dead);
 
-  // Garantía: si el nivel se limpia sin que haya salido el power-up, forzarlo
-  if (asteroids.length === 0 && !powerupSpawnedThisLevel && lastKillPos) {
+  // Garantía: si el nivel se limpia sin que haya salido ningún power-up, forzar al menos uno
+  if (asteroids.length === 0 && powerupsSpawnedThisLevel === 0 && lastKillPos) {
     powerups.push(new PowerUp(lastKillPos.x, lastKillPos.y, randomPowerUpType()));
-    powerupSpawnedThisLevel = true;
+    powerupsSpawnedThisLevel++;
   }
 
   // Nave vs asteroide
