@@ -6,18 +6,29 @@ const W = 800;
 const H = 600;
 
 const overlay = document.getElementById('overlay');
-const continueBtn = document.getElementById('continue-btn');
+const resumeBtn = document.getElementById('resume-btn');
 const restartBtn = document.getElementById('restart-btn');
+const controlsBtn = document.getElementById('controls-btn');
+const backBtn = document.getElementById('back-btn');
+const pauseMainView = document.getElementById('pause-main');
+const pauseControlsView = document.getElementById('pause-controls');
+const levelDecBtn = document.getElementById('level-dec');
+const levelIncBtn = document.getElementById('level-inc');
+const levelValueEl = document.getElementById('level-value');
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 const keys = {};
 const justPressed = {};
 
 window.addEventListener('keydown', e => {
-  justPressed[e.code] = !keys[e.code];
-  keys[e.code] = true;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code))
     e.preventDefault();
+  // Con el menú de pausa abierto, solo P/ESC deben llegar al juego — el resto de
+  // teclas queda bloqueado para que no queden inputs "pegados" (p. ej. ArrowUp)
+  // que muevan la nave apenas se reanude.
+  if (paused && e.code !== 'KeyP' && e.code !== 'Escape') return;
+  justPressed[e.code] = !keys[e.code];
+  keys[e.code] = true;
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 
@@ -377,6 +388,11 @@ let maxPowerupsThisLevel;     // tope de power-ups para el nivel actual (escala 
 let novaFlash = 0;     // temporizador de la onda expansiva visual de la bomba nova
 let novaOrigin = null; // punto donde se activó la última bomba nova
 
+// Nivel con el que arrancará la próxima partida, elegido desde el menú de pausa.
+const MIN_START_LEVEL = 1;
+const MAX_START_LEVEL = 20;
+let selectedStartLevel = MIN_START_LEVEL;
+
 // A más nivel, más power-ups pueden aparecer: sube 1 cada 3 niveles, con un tope de 5.
 function computeMaxPowerups(lvl) {
   return Math.min(1 + Math.floor((lvl - 1) / 3), 5);
@@ -402,13 +418,13 @@ function initGame() {
   powerups  = [];
   score  = 0;
   lives  = 3;
-  level  = 1;
+  level  = selectedStartLevel;
   state  = 'playing';
   powerupsSpawnedThisLevel = 0;
   maxPowerupsThisLevel     = computeMaxPowerups(level);
   novaFlash  = 0;
   novaOrigin = null;
-  spawnAsteroids(4);
+  spawnAsteroids(3 + level);
 }
 
 function nextLevel() {
@@ -453,15 +469,48 @@ function killShip() {
   }
 }
 
+// Limpia cualquier tecla retenida mientras el menú estaba abierto (p. ej. si quedó
+// ArrowUp "presionada") para que volver al juego no mueva/dispare la nave sola.
+function clearInputState() {
+  for (const k in keys) keys[k] = false;
+  for (const k in justPressed) justPressed[k] = false;
+}
+
 function togglePause() {
   if (state === 'gameover') return;
   paused = !paused;
   overlay.classList.toggle('hidden', !paused);
+  if (paused) {
+    showPauseMain();
+  } else {
+    clearInputState();
+  }
+}
+
+function showPauseMain() {
+  pauseControlsView.classList.add('hidden');
+  pauseMainView.classList.remove('hidden');
+}
+
+function showPauseControls() {
+  pauseMainView.classList.add('hidden');
+  pauseControlsView.classList.remove('hidden');
+}
+
+function updateLevelSelectUI() {
+  levelValueEl.textContent  = selectedStartLevel;
+  levelDecBtn.disabled = selectedStartLevel <= MIN_START_LEVEL;
+  levelIncBtn.disabled = selectedStartLevel >= MAX_START_LEVEL;
+}
+
+function changeStartLevel(delta) {
+  selectedStartLevel = Math.min(MAX_START_LEVEL, Math.max(MIN_START_LEVEL, selectedStartLevel + delta));
+  updateLevelSelectUI();
 }
 
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
-  if (pressed('KeyP')) togglePause();
+  if (pressed('KeyP') || pressed('Escape')) togglePause();
   if (paused) return;
 
   if (state === 'gameover') {
@@ -601,7 +650,7 @@ function drawHUD() {
   ctx.textAlign = 'left';
   ctx.font = '12px monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.fillText('P: PAUSA', 14, H - 12);
+  ctx.fillText('P / ESC: PAUSA', 14, H - 12);
 
   ctx.font = '13px monospace';
   let statusY = 46;
@@ -675,12 +724,18 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
-continueBtn.addEventListener('click', () => { if (paused) togglePause(); });
+resumeBtn.addEventListener('click', () => { if (paused) togglePause(); });
 restartBtn.addEventListener('click', () => {
   paused = false;
   overlay.classList.add('hidden');
+  clearInputState();
   initGame();
 });
+controlsBtn.addEventListener('click', showPauseControls);
+backBtn.addEventListener('click', showPauseMain);
+levelDecBtn.addEventListener('click', () => changeStartLevel(-1));
+levelIncBtn.addEventListener('click', () => changeStartLevel(1));
 
+updateLevelSelectUI();
 initGame();
 requestAnimationFrame(loop);
