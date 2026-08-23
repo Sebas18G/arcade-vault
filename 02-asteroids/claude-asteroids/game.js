@@ -289,11 +289,15 @@ class Particle {
   }
 }
 
-// ── Power-up (disparo triple / escudo temporal / slow motion) ─────────────────
+// ── Power-up (disparo triple / escudo temporal / slow motion / bomba nova) ────
 const POWERUP_STYLES = {
-  triple: { color: '#0ff', label: '3x' },
-  shield: { color: '#5c8', label: 'ESC' },
-  slowmo: { color: '#fc5', label: 'x½' },
+  triple: { color: '#0ff', label: '3x',   shape: 'diamond' },
+  shield: { color: '#5c8', label: 'ESC',  shape: 'diamond' },
+  slowmo: { color: '#fc5', label: 'x½',   shape: 'diamond' },
+  // grabRadius amplio: el mayor radio de colisión letal (asteroide grande, ~41px + radio
+  // de la nave) supera el radio visual del ítem, así que sin esto la nave suele morir
+  // contra un asteroide cercano antes de llegar a tocar la bomba.
+  nova:   { color: '#ff5252', label: 'NOVA', shape: 'hexagon', blink: true, grabRadius: 44 },
 };
 const POWERUP_TYPES = Object.keys(POWERUP_STYLES);
 const randomPowerUpType = () => POWERUP_TYPES[randInt(0, POWERUP_TYPES.length - 1)];
@@ -318,6 +322,9 @@ class PowerUp {
   draw() {
     const style = POWERUP_STYLES[this.type];
 
+    // Parpadeo: el ítem se apaga en ciclos alternos para llamar la atención.
+    if (style.blink && Math.floor(this.ttl * 6) % 2 === 0) return;
+
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
@@ -325,10 +332,20 @@ class PowerUp {
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
     ctx.beginPath();
-    ctx.moveTo( this.radius, 0);
-    ctx.lineTo(0,  this.radius);
-    ctx.lineTo(-this.radius, 0);
-    ctx.lineTo(0, -this.radius);
+    if (style.shape === 'hexagon') {
+      const sides = 6;
+      for (let i = 0; i < sides; i++) {
+        const a  = (i / sides) * Math.PI * 2;
+        const px = Math.cos(a) * this.radius;
+        const py = Math.sin(a) * this.radius;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+    } else {
+      ctx.moveTo( this.radius, 0);
+      ctx.lineTo(0,  this.radius);
+      ctx.lineTo(-this.radius, 0);
+      ctx.lineTo(0, -this.radius);
+    }
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
@@ -351,6 +368,8 @@ let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
 let paused = false;
 let powerupSpawnedThisLevel; // true si el power-up ya apareció en el nivel actual (una vez por nivel)
+let novaFlash = 0;    // temporizador de la onda expansiva visual de la bomba nova
+let novaOrigin = null; // punto donde se activó la última bomba nova
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -375,6 +394,8 @@ function initGame() {
   level  = 1;
   state  = 'playing';
   powerupSpawnedThisLevel = false;
+  novaFlash  = 0;
+  novaOrigin = null;
   spawnAsteroids(4);
 }
 
@@ -389,6 +410,19 @@ function nextLevel() {
 
 function explode(x, y, count = 8) {
   for (let i = 0; i < count; i++) particles.push(new Particle(x, y));
+}
+
+// Bomba Nova: destruye de golpe todos los asteroides visibles, sin fragmentarlos.
+function triggerNovaBomb() {
+  for (const a of asteroids) {
+    if (a.dead) continue;
+    a.dead = true;
+    score += POINTS[a.size];
+    explode(a.x, a.y, a.size * 6);
+  }
+  asteroids = asteroids.filter(a => !a.dead);
+  novaOrigin = { x: ship.x, y: ship.y };
+  novaFlash  = 0.4;
 }
 
 function killShip() {
@@ -477,6 +511,22 @@ function update(dt) {
     powerupSpawnedThisLevel = true;
   }
 
+  // Nave vs power-up (antes que nave vs asteroide: así el escudo o la bomba nova
+  // recogidos en el mismo frame alcanzan a proteger a la nave)
+  if (!ship.dead) {
+    for (const p of powerups) {
+      const pickupRadius = POWERUP_STYLES[p.type].grabRadius ?? p.radius;
+      if (!p.dead && dist(ship, p) < ship.radius + pickupRadius) {
+        p.dead = true;
+        if (p.type === 'shield') ship.shieldTimer = 5;
+        else if (p.type === 'slowmo') ship.slowMoTimer = 6;
+        else if (p.type === 'nova') triggerNovaBomb();
+        else ship.tripleShotTimer = 8;
+      }
+    }
+  }
+  powerups = powerups.filter(p => !p.dead);
+
   // Nave vs asteroide
   if (ship.invincible <= 0) {
     for (const a of asteroids) {
@@ -494,18 +544,7 @@ function update(dt) {
     }
   }
 
-  // Nave vs power-up
-  if (!ship.dead) {
-    for (const p of powerups) {
-      if (!p.dead && dist(ship, p) < ship.radius + p.radius) {
-        p.dead = true;
-        if (p.type === 'shield') ship.shieldTimer = 5;
-        else if (p.type === 'slowmo') ship.slowMoTimer = 6;
-        else ship.tripleShotTimer = 8;
-      }
-    }
-  }
-  powerups = powerups.filter(p => !p.dead);
+  if (novaFlash > 0) novaFlash -= dt;
 
   // Nivel completado
   if (asteroids.length === 0) nextLevel();
@@ -584,6 +623,18 @@ function draw() {
   bullets.forEach(b => b.draw());
   powerups.forEach(p => p.draw());
   ship.draw();
+
+  if (novaFlash > 0 && novaOrigin) {
+    const t     = 1 - novaFlash / 0.4; // 0 → 1
+    const alpha = 1 - t;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 82, 82, ${alpha.toFixed(2)})`;
+    ctx.lineWidth   = 3;
+    ctx.beginPath();
+    ctx.arc(novaOrigin.x, novaOrigin.y, t * 420, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   drawHUD();
 
