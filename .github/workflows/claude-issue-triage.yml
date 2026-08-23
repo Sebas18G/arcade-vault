@@ -50,6 +50,10 @@ jobs:
                - Enfoque sugerido para la solución (a alto nivel, SIN
                  implementar código todavía — esto es solo diagnóstico).
                Firma el comentario indicando que es un análisis automático de Claude.
+               El comentario debe estar escrito en formato Markdown válido y
+               correctamente interpretable por GitHub (usa encabezados, listas,
+               negritas y bloques de código con las etiquetas de lenguaje
+               correspondientes cuando corresponda).
 
             No modifiques el cuerpo original del issue ni escribas código.
           claude_args: |
