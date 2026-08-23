@@ -73,6 +73,11 @@ const SPAWN_WEIGHTS = [
 ];
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
+const T_SPIN_SCORES = [400, 800, 1200, 1600]; // índice = líneas limpiadas (0 = T-spin sin línea)
+const T_SPIN_LABELS = { 0: 'T-SPIN', 1: 'T-SPIN SINGLE', 2: 'T-SPIN DOUBLE', 3: 'T-SPIN TRIPLE' };
+const PERFECT_CLEAR_SCORES = [0, 800, 1200, 1800, 2000]; // índice = líneas limpiadas
+const T_TYPE = 3;
+const B2B_BONUS_RATIO = 0.5;
 
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
@@ -90,12 +95,16 @@ const nextLabelEl = document.getElementById('next-label');
 const powerupToastEl = document.getElementById('powerup-toast');
 const freezeStatusSection = document.getElementById('freeze-status-section');
 const freezeStatusEl = document.getElementById('freeze-status');
+const comboStatusSection = document.getElementById('combo-status-section');
+const comboStatusEl = document.getElementById('combo-status');
+const comboToastEl = document.getElementById('combo-toast');
 
 const THEME_KEY = 'tetris-theme';
 let gridColor = '#22222e';
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 let linesSincePowerUp, powerUpThreshold, lastPowerUpType, freezeRemaining, toastTimeoutId;
+let comboCount, backToBackActive, lastActionRotation, comboToastTimeoutId, boardFlashTimeoutId, audioCtx;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -160,9 +169,26 @@ function tryRotate() {
     if (!collide(rotated, current.x + kick, current.y)) {
       current.shape = rotated;
       current.x += kick;
+      lastActionRotation = true;
       return;
     }
   }
+}
+
+// Regla simplificada de "3 esquinas": el centro de la pieza T (fijo en shape[1][1],
+// ya que su matriz 3x3 nunca se recorta) debe tener al menos 3 de sus 4 esquinas
+// diagonales ocupadas (por bloques fijados o por el borde del tablero), y la última
+// acción antes de fijar la pieza debe haber sido una rotación.
+function detectTSpin() {
+  if (current.type !== T_TYPE || !lastActionRotation) return false;
+  const cy = current.y + 1;
+  const cx = current.x + 1;
+  const corners = [[cy - 1, cx - 1], [cy - 1, cx + 1], [cy + 1, cx - 1], [cy + 1, cx + 1]];
+  let filled = 0;
+  for (const [r, c] of corners) {
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS || board[r][c]) filled++;
+  }
+  return filled >= 3;
 }
 
 function merge() {
@@ -172,7 +198,7 @@ function merge() {
         board[current.y + r][current.x + c] = current.shape[r][c];
 }
 
-function clearLines() {
+function clearLines(isTSpin) {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
     if (board[r].every(v => v !== 0)) {
@@ -182,25 +208,165 @@ function clearLines() {
       r++;
     }
   }
-  if (cleared) {
-    lines += cleared;
-    score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
-    linesSincePowerUp += cleared;
-    if (cleared === 4) {
-      next = createPiece(REWARD_TYPE);
-      drawNext();
-    } else if (linesSincePowerUp >= powerUpThreshold) {
-      linesSincePowerUp = 0;
-      powerUpThreshold = rollPowerUpThreshold(level);
-      const type = pickPowerUpType();
-      lastPowerUpType = type;
-      next = createPiece(type);
-      drawNext();
+
+  if (cleared === 0) {
+    if (comboCount > 0) {
+      comboCount = 0;
+      updateComboHUD();
     }
-    updateHUD();
+    if (isTSpin) {
+      score += T_SPIN_SCORES[0] * level;
+      updateHUD();
+      triggerClearEffects({ cleared: 0, isTSpin: true, comboCount: 0, isB2B: false, perfectClear: false });
+    }
+    return;
   }
+
+  lines += cleared;
+  comboCount++;
+
+  let clearScore = ((isTSpin ? T_SPIN_SCORES[cleared] : LINE_SCORES[cleared]) || 0) * level;
+  clearScore *= comboCount;
+
+  const isB2BEligible = cleared === 4 || isTSpin;
+  const isB2B = isB2BEligible && backToBackActive;
+  if (isB2B) clearScore += Math.round(clearScore * B2B_BONUS_RATIO);
+  backToBackActive = isB2BEligible;
+
+  score += clearScore;
+
+  const perfectClear = board.every(row => row.every(v => v === 0));
+  if (perfectClear) {
+    score += (PERFECT_CLEAR_SCORES[cleared] || PERFECT_CLEAR_SCORES[4]) * level;
+  }
+
+  level = Math.floor(lines / 10) + 1;
+  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  linesSincePowerUp += cleared;
+
+  if (cleared === 4) {
+    next = createPiece(REWARD_TYPE);
+    drawNext();
+  } else if (linesSincePowerUp >= powerUpThreshold) {
+    linesSincePowerUp = 0;
+    powerUpThreshold = rollPowerUpThreshold(level);
+    const type = pickPowerUpType();
+    lastPowerUpType = type;
+    next = createPiece(type);
+    drawNext();
+  }
+
+  updateHUD();
+  updateComboHUD();
+  triggerClearEffects({ cleared, isTSpin, comboCount, isB2B, perfectClear });
+}
+
+function updateComboHUD() {
+  if (comboCount > 1) {
+    comboStatusSection.hidden = false;
+    comboStatusEl.textContent = `x${comboCount}`;
+    comboStatusEl.classList.remove('combo-value');
+    void comboStatusEl.offsetWidth; // reinicia la animación CSS
+    comboStatusEl.classList.add('combo-value');
+  } else {
+    comboStatusSection.hidden = true;
+  }
+}
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
+    if (!AC) return null;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(freq, duration, delay = 0, type = 'square', volume = 0.15) {
+  const ctxA = getAudioCtx();
+  if (!ctxA) return;
+  const osc = ctxA.createOscillator();
+  const gain = ctxA.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  osc.connect(gain);
+  gain.connect(ctxA.destination);
+  const startTime = ctxA.currentTime + delay;
+  gain.gain.setValueAtTime(volume, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+}
+
+function playClearSound({ cleared, isTSpin, comboCount: combo, isB2B, perfectClear }) {
+  try {
+    if (perfectClear) {
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => playTone(f, 0.25, i * 0.08, 'triangle', 0.18));
+      return;
+    }
+    if (isTSpin) {
+      playTone(440, 0.12, 0, 'sawtooth', 0.15);
+      playTone(660, 0.15, 0.06, 'sawtooth', 0.15);
+    } else if (cleared === 4) {
+      [392, 523.25, 659.25].forEach((f, i) => playTone(f, 0.18, i * 0.05, 'square', 0.15));
+    } else if (cleared > 0) {
+      playTone(330 + cleared * 40, 0.1, 0, 'square', 0.12);
+    }
+    if (isB2B) playTone(880, 0.1, 0.12, 'sine', 0.12);
+    if (combo > 1) playTone(220 + combo * 30, 0.08, (isTSpin || cleared === 4) ? 0.18 : 0.06, 'triangle', 0.1);
+  } catch (e) {
+    // audio no soportado o bloqueado: efecto silencioso, no bloquea el juego
+  }
+}
+
+function showComboToast(text) {
+  comboToastEl.textContent = text;
+  comboToastEl.classList.remove('hidden');
+  comboToastEl.classList.add('show');
+  clearTimeout(comboToastTimeoutId);
+  comboToastTimeoutId = setTimeout(() => {
+    comboToastEl.classList.remove('show');
+  }, 1100);
+}
+
+function flashBoard(className) {
+  canvas.classList.remove('flash-normal', 'flash-tspin', 'flash-tetris', 'flash-b2b', 'flash-perfect');
+  void canvas.offsetWidth; // reinicia la animación CSS
+  canvas.classList.add(className);
+  clearTimeout(boardFlashTimeoutId);
+  boardFlashTimeoutId = setTimeout(() => canvas.classList.remove(className), 600);
+}
+
+function triggerClearEffects({ cleared, isTSpin, comboCount: combo, isB2B, perfectClear }) {
+  const messages = [];
+  let flashClass = null;
+
+  if (isTSpin) {
+    messages.push(T_SPIN_LABELS[cleared] || 'T-SPIN');
+    flashClass = 'flash-tspin';
+  } else if (cleared === 4) {
+    messages.push('TETRIS');
+    flashClass = 'flash-tetris';
+  } else if (cleared > 0) {
+    flashClass = 'flash-normal';
+  }
+
+  if (isB2B) {
+    messages.push('BACK-TO-BACK');
+    flashClass = 'flash-b2b';
+  }
+
+  if (combo > 1) messages.push(`COMBO x${combo}`);
+
+  if (perfectClear) {
+    messages.push('PERFECT CLEAR');
+    flashClass = 'flash-perfect';
+  }
+
+  if (messages.length) showComboToast(messages.join(' · '));
+  if (flashClass) flashBoard(flashClass);
+  playClearSound({ cleared, isTSpin, comboCount: combo, isB2B, perfectClear });
 }
 
 function ghostY() {
@@ -313,12 +479,14 @@ function lockPiece() {
   if (POWERUP_TYPES.includes(current.type)) {
     applyPowerUpEffect(current.type, current.y, current.x);
   }
-  clearLines();
+  const isTSpin = detectTSpin();
+  clearLines(isTSpin);
   spawn();
 }
 
 function spawn() {
   current = next;
+  lastActionRotation = false;
   next = randomPiece();
   if (collide(current.shape, current.x, current.y)) {
     endGame();
@@ -466,6 +634,15 @@ function init() {
   clearTimeout(toastTimeoutId);
   powerupToastEl.classList.remove('show');
   powerupToastEl.classList.add('hidden');
+  comboCount = 0;
+  backToBackActive = false;
+  lastActionRotation = false;
+  clearTimeout(comboToastTimeoutId);
+  comboToastEl.classList.remove('show');
+  comboToastEl.classList.add('hidden');
+  comboStatusSection.hidden = true;
+  clearTimeout(boardFlashTimeoutId);
+  canvas.classList.remove('flash-normal', 'flash-tspin', 'flash-tetris', 'flash-b2b', 'flash-perfect');
   next = randomPiece();
   spawn();
   updateHUD();
@@ -479,10 +656,10 @@ document.addEventListener('keydown', e => {
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
-      if (!collide(current.shape, current.x - 1, current.y)) current.x--;
+      if (!collide(current.shape, current.x - 1, current.y)) { current.x--; lastActionRotation = false; }
       break;
     case 'ArrowRight':
-      if (!collide(current.shape, current.x + 1, current.y)) current.x++;
+      if (!collide(current.shape, current.x + 1, current.y)) { current.x++; lastActionRotation = false; }
       break;
     case 'ArrowDown':
       softDrop();

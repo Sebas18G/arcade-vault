@@ -20,6 +20,7 @@
     <div class="game-container">
       <div class="board-wrap">
         <canvas id="board" width="300" height="600"></canvas>
+        <div id="combo-toast" class="combo-toast hidden"></div>
         <div id="powerup-toast" class="powerup-toast hidden"></div>
       </div>
 
@@ -35,6 +36,11 @@
         <div class="panel-section">
           <span class="label">LEVEL</span>
           <span class="value" id="level">1</span>
+        </div>
+
+        <div class="panel-section" id="combo-status-section" hidden>
+          <span class="label">COMBO</span>
+          <span class="value combo-value" id="combo-status">x1</span>
         </div>
 
         <div class="panel-section">
