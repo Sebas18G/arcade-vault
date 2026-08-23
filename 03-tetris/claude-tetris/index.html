@@ -18,7 +18,10 @@
     </div>
     <h1 class="game-title">TETRIS</h1>
     <div class="game-container">
-      <canvas id="board" width="300" height="600"></canvas>
+      <div class="board-wrap">
+        <canvas id="board" width="300" height="600"></canvas>
+        <div id="powerup-toast" class="powerup-toast hidden"></div>
+      </div>
 
       <aside class="panel">
         <div class="panel-section">
@@ -37,6 +40,12 @@
         <div class="panel-section">
           <span class="label">NEXT</span>
           <canvas id="next-canvas" width="120" height="120"></canvas>
+          <span class="value next-label" id="next-label"></span>
+        </div>
+
+        <div class="panel-section" id="freeze-status-section" hidden>
+          <span class="label">EFECTO</span>
+          <span class="value" id="freeze-status"></span>
         </div>
 
         <div class="panel-section controls">
