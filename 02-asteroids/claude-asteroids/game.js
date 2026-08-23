@@ -161,6 +161,7 @@ class Ship {
     this.tripleShotTimer = 0;
     this.shieldTimer     = 0;
     this.slowMoTimer     = 0;
+    this.hyperTimer      = 0;
     this.dead            = false;
   }
 
@@ -171,10 +172,12 @@ class Ship {
     if (this.tripleShotTimer > 0) this.tripleShotTimer -= dt;
     if (this.shieldTimer    > 0) this.shieldTimer    -= dt;
     if (this.slowMoTimer    > 0) this.slowMoTimer    -= dt;
+    if (this.hyperTimer     > 0) this.hyperTimer     -= dt;
 
-    const ROT   = 3.5;   // rad/s
-    const THRUST = 260;  // px/s²
-    const DRAG   = 0.987;
+    const hyperActive = this.hyperTimer > 0;
+    const ROT    = 3.5;                        // rad/s
+    const THRUST = hyperActive ? 260 * 2.2 : 260; // px/s² — hiperpropulsión: aceleración drástica
+    const DRAG   = hyperActive ? 0.994 : 0.987;   // menos arrastre → velocidad máxima más alta
 
     if (keys['ArrowLeft'])  this.angle -= ROT * dt;
     if (keys['ArrowRight']) this.angle += ROT * dt;
@@ -230,13 +233,14 @@ class Ship {
     ctx.closePath();
     ctx.stroke();
 
-    // Llama del propulsor
+    // Llama del propulsor (más larga e intensa con hiperpropulsión activa)
     if (this.thrusting && Math.random() > 0.35) {
+      const hyperActive = this.hyperTimer > 0;
       ctx.beginPath();
       ctx.moveTo(-8, -4);
-      ctx.lineTo(-8 - rand(6, 14), 0);
+      ctx.lineTo(-8 - rand(...(hyperActive ? [16, 30] : [6, 14])), 0);
       ctx.lineTo(-8,  4);
-      ctx.strokeStyle = 'rgba(255, 130, 0, 0.85)';
+      ctx.strokeStyle = hyperActive ? 'rgba(170, 90, 255, 0.9)' : 'rgba(255, 130, 0, 0.85)';
       ctx.stroke();
     }
 
@@ -289,11 +293,12 @@ class Particle {
   }
 }
 
-// ── Power-up (disparo triple / escudo temporal / slow motion) ─────────────────
+// ── Power-up (disparo triple / escudo temporal / slow motion / hiperpropulsión) ─
 const POWERUP_STYLES = {
-  triple: { color: '#0ff', label: '3x' },
-  shield: { color: '#5c8', label: 'ESC' },
-  slowmo: { color: '#fc5', label: 'x½' },
+  triple: { color: '#0ff', label: '3x',  shape: 'diamond' },
+  shield: { color: '#5c8', label: 'ESC', shape: 'diamond' },
+  slowmo: { color: '#fc5', label: 'x½',  shape: 'diamond' },
+  hyper:  { color: '#a5f', label: 'HIP', shape: 'hexagon' },
 };
 const POWERUP_TYPES = Object.keys(POWERUP_STYLES);
 const randomPowerUpType = () => POWERUP_TYPES[randInt(0, POWERUP_TYPES.length - 1)];
@@ -325,10 +330,20 @@ class PowerUp {
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
     ctx.beginPath();
-    ctx.moveTo( this.radius, 0);
-    ctx.lineTo(0,  this.radius);
-    ctx.lineTo(-this.radius, 0);
-    ctx.lineTo(0, -this.radius);
+    if (style.shape === 'hexagon') {
+      const sides = 6;
+      for (let i = 0; i < sides; i++) {
+        const a  = (i / sides) * Math.PI * 2;
+        const px = Math.cos(a) * this.radius;
+        const py = Math.sin(a) * this.radius;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+    } else {
+      ctx.moveTo( this.radius, 0);
+      ctx.lineTo(0,  this.radius);
+      ctx.lineTo(-this.radius, 0);
+      ctx.lineTo(0, -this.radius);
+    }
     ctx.closePath();
     ctx.stroke();
     ctx.restore();
@@ -501,6 +516,7 @@ function update(dt) {
         p.dead = true;
         if (p.type === 'shield') ship.shieldTimer = 5;
         else if (p.type === 'slowmo') ship.slowMoTimer = 6;
+        else if (p.type === 'hyper') ship.hyperTimer = 8;
         else ship.tripleShotTimer = 8;
       }
     }
@@ -562,6 +578,11 @@ function drawHUD() {
   if (ship.slowMoTimer > 0) {
     ctx.fillStyle = '#fc5';
     ctx.fillText(`SLOW MOTION ${ship.slowMoTimer.toFixed(1)}s`, 14, statusY);
+    statusY += 18;
+  }
+  if (ship.hyperTimer > 0) {
+    ctx.fillStyle = '#a5f';
+    ctx.fillText(`HIPERPROPULSIÓN ${ship.hyperTimer.toFixed(1)}s`, 14, statusY);
   }
 }
 
