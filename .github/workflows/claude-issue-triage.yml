@@ -1,0 +1,56 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Issue Triage
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Analiza el issue #${{ github.event.issue.number }} de este repositorio
+            (título: "${{ github.event.issue.title }}").
+
+            Este repo contiene varios mini-proyectos de práctica con Claude Code:
+            - 01-first-code/ (ejercicio inicial simple)
+            - 02-asteroids/claude-asteroids/ (clon de Asteroids en Canvas HTML5)
+            - 03-tetris/claude-tetris/ (clon de Tetris en Canvas HTML5)
+
+            Tareas:
+            1. Determina qué labels son apropiadas para este issue (tipo: bug,
+               enhancement, question, docs, etc.; y si aplica, el subproyecto
+               afectado: asteroids, tetris, first-code). Si algún label todavía
+               no existe en el repo, créalo con `gh label create` (color y
+               descripción breves) y luego asígnalo con
+               `gh issue edit ${{ github.event.issue.number }} --add-label "..."`.
+            2. Publica UN comentario nuevo en el issue con
+               `gh issue comment ${{ github.event.issue.number }} --body "..."`
+               que contenga un diagnóstico general del problema:
+               - Resumen del problema en 1-2 líneas.
+               - Área/archivo(s) del código probablemente involucrados.
+               - Causa probable o hipótesis principal.
+               - Enfoque sugerido para la solución (a alto nivel, SIN
+                 implementar código todavía — esto es solo diagnóstico).
+               Firma el comentario indicando que es un análisis automático de Claude.
+
+            No modifiques el cuerpo original del issue ni escribas código.
+          claude_args: |
+            --allowedTools "Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh label create:*),Bash(gh label list:*)"
