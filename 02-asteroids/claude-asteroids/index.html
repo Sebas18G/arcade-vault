@@ -31,16 +31,43 @@
     .overlay.hidden {
       display: none;
     }
+    .hidden {
+      display: none;
+    }
     .overlay-box {
       text-align: center;
       font-family: monospace;
       color: #fff;
     }
-    #overlay-title {
+    .overlay-box-wide {
+      min-width: 460px;
+      max-width: 640px;
+    }
+    #overlay-title, .overlay-title {
       font-size: 32px;
       font-weight: bold;
       letter-spacing: 6px;
       margin-bottom: 20px;
+    }
+    .overlay-title-sm {
+      font-size: 26px;
+      font-weight: bold;
+      letter-spacing: 5px;
+      margin-bottom: 10px;
+    }
+    .overlay-hint {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      margin: 4px 0 10px;
+    }
+    .overlay-score {
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+    .overlay-stats {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 10px;
     }
     .overlay-actions {
       display: flex;
@@ -63,10 +90,72 @@
     .overlay-actions button:hover {
       opacity: 0.8;
     }
-    #restart-btn {
+    #restart-btn, .overlay-actions button.btn-secondary {
       background: transparent;
       color: #fff;
       border: 1px solid #666;
+    }
+    .name-entry {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+    .name-entry.hidden {
+      display: none;
+    }
+    .name-entry input {
+      font-family: monospace;
+      font-size: 13px;
+      padding: 8px 10px;
+      background: #111;
+      color: #fff;
+      border: 1px solid #555;
+      border-radius: 4px;
+      letter-spacing: 1px;
+      width: 160px;
+      text-transform: uppercase;
+    }
+    .name-entry button {
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: bold;
+      font-family: monospace;
+      cursor: pointer;
+    }
+    .leaderboard {
+      margin: 10px 0;
+    }
+    .leaderboard-empty {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      padding: 10px 0;
+    }
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .leaderboard-table th,
+    .leaderboard-table td {
+      padding: 4px 8px;
+      text-align: center;
+    }
+    .leaderboard-table th {
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: normal;
+      border-bottom: 1px solid #333;
+    }
+    .leaderboard-table td:nth-child(2) {
+      text-align: left;
+    }
+    .leaderboard-table tr.highlight td {
+      color: #ff5252;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -75,11 +164,42 @@
     <canvas id="canvas" width="800" height="600"></canvas>
     <div id="overlay" class="overlay hidden">
       <div class="overlay-box">
-        <p id="overlay-title">PAUSA</p>
+        <p class="overlay-title">PAUSA</p>
         <div class="overlay-actions">
           <button id="continue-btn">Continuar</button>
           <button id="restart-btn">Reiniciar</button>
         </div>
+      </div>
+    </div>
+
+    <div id="start-overlay" class="overlay">
+      <div class="overlay-box overlay-box-wide">
+        <p class="overlay-title">ASTEROIDS</p>
+        <p class="overlay-hint">ESPACIO o click en JUGAR para empezar</p>
+        <div id="start-leaderboard" class="leaderboard"></div>
+        <div class="overlay-actions">
+          <button id="start-btn">Jugar</button>
+          <button id="reset-records-btn" class="btn-secondary">Resetear records</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="gameover-overlay" class="overlay hidden">
+      <div class="overlay-box overlay-box-wide">
+        <p class="overlay-title-sm">GAME OVER</p>
+        <p id="gameover-score" class="overlay-score"></p>
+        <p id="gameover-stats" class="overlay-stats"></p>
+        <p id="qualify-msg" class="overlay-hint"></p>
+        <div id="name-entry" class="name-entry hidden">
+          <input id="player-name-input" type="text" maxlength="12" placeholder="TU NOMBRE" autocomplete="off">
+          <button id="save-score-btn">Guardar</button>
+        </div>
+        <div id="gameover-leaderboard" class="leaderboard"></div>
+        <div class="overlay-actions">
+          <button id="gameover-restart-btn">Reiniciar</button>
+          <button id="reset-records-btn-2" class="btn-secondary">Resetear records</button>
+        </div>
+        <p class="overlay-hint">ESPACIO PARA REINICIAR</p>
       </div>
     </div>
   </div>
