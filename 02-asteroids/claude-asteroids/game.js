@@ -425,10 +425,13 @@ function explode(x, y, count = 8) {
   for (let i = 0; i < count; i++) particles.push(new Particle(x, y));
 }
 
-// Bomba Nova: destruye de golpe todos los asteroides visibles, sin fragmentarlos.
+// Bomba Nova: destruye de golpe, sin fragmentarlos, los asteroides dentro del radio de la
+// onda expansiva (mismo radio que dibuja la animación, NOVA_BLAST_RADIUS).
+const NOVA_BLAST_RADIUS = 420;
 function triggerNovaBomb() {
   for (const a of asteroids) {
     if (a.dead) continue;
+    if (dist(ship, a) > NOVA_BLAST_RADIUS) continue;
     a.dead = true;
     score += POINTS[a.size];
     explode(a.x, a.y, a.size * 6);
@@ -650,7 +653,7 @@ function draw() {
     ctx.strokeStyle = `rgba(255, 82, 82, ${alpha.toFixed(2)})`;
     ctx.lineWidth   = 3;
     ctx.beginPath();
-    ctx.arc(novaOrigin.x, novaOrigin.y, t * 420, 0, Math.PI * 2);
+    ctx.arc(novaOrigin.x, novaOrigin.y, t * NOVA_BLAST_RADIUS, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
