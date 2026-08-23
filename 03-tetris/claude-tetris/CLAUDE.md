@@ -35,3 +35,17 @@ Puntos clave del modelo, todos en `game.js`:
 - Un único listener `keydown` en `document` maneja todos los controles (flechas, `X` para rotar, `Space` para hard drop, `P` para pausa); se ignoran inputs si `paused` o `gameOver` están activos.
 
 Si se ajustan `COLS`, `ROWS` o `BLOCK` en `game.js`, hay que actualizar también `width`/`height` del `<canvas id="board">` en `index.html` para que coincidan (`COLS × BLOCK`, `ROWS × BLOCK`).
+
+## Power-ups
+
+Piezas especiales de 1 bloque (tipos 13–17, análogas a `SINGLE`/`REWARD_TYPE`) que aparecen tras cierto número de líneas eliminadas y disparan un efecto sobre el tablero al fijarse (`applyPowerUpEffect`, llamada desde `lockPiece` justo después de `merge`, antes de `clearLines`):
+
+- **Bomba** (`BOMB_TYPE`, 13): destruye el área 3×3 centrada en su celda (`effectBomb`).
+- **Rayo** (`LIGHTNING_TYPE`, 14): limpia la fila y la columna completas donde cae (`effectLightning`).
+- **Tinte** (`DYE_TYPE`, 15): elige al azar un color presente en el tablero y elimina todos sus bloques, luego compacta (`effectDye` + `applyGravityCompact`).
+- **Gravedad** (`GRAVITY_TYPE`, 16): compacta huecos de cada columna hacia abajo (`applyGravityCompact`).
+- **Congelar** (`FREEZE_TYPE`, 17): detiene la caída automática 5s (`freezeRemaining`, consumido en `loop` como delta de tiempo — no como timestamp absoluto, para que la pausa manual con `P` no lo afecte); el jugador conserva movimiento/rotación/hard-drop.
+
+La celda de la propia pieza especial siempre se limpia (`clearCell(cy, cx)` al inicio de `applyPowerUpEffect`) para que ningún power-up deje un bloque permanente como si fuera una pieza normal.
+
+Frecuencia y elección: `linesSincePowerUp` acumula líneas eliminadas; al alcanzar `powerUpThreshold` (recalculado con `rollPowerUpThreshold(level)`, más frecuente a mayor nivel) se sobreescribe `next` con un power-up elegido al azar sin repetir el último (`pickPowerUpType`). Si el mismo clear es un Tetris (4 líneas), tiene prioridad la pieza `REWARD_TYPE` y el contador de power-up no se resetea (se evalúa en el siguiente clear). Los tipos de power-up quedan fuera de `SPAWN_WEIGHTS`, igual que `REWARD_TYPE`, por lo que nunca salen del sorteo normal de piezas.

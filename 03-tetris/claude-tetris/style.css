@@ -141,12 +141,49 @@ body {
   align-items: flex-start;
 }
 
+.board-wrap {
+  position: relative;
+}
+
 #board {
   display: block;
   border: 1px solid var(--board-border);
   background: var(--board-bg);
   border-radius: 4px;
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+}
+
+.powerup-toast {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  padding: 10px 20px;
+  background: rgba(10, 10, 20, 0.8);
+  border: 1px solid var(--board-border);
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #fff;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.powerup-toast.hidden {
+  display: none;
+}
+
+.powerup-toast.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.next-label {
+  font-size: 12px !important;
+  letter-spacing: 0 !important;
 }
 
 /* ---- Panel lateral ---- */
