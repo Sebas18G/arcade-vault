@@ -13,6 +13,11 @@ const COLORS = [
   '#e57373', // Z - red
   '#64b5f6', // J - pale blue
   '#ffb74d', // L - orange
+  '#f06292', // PLUS - rosa (pentominó)
+  '#7986cb', // U - índigo (pentominó)
+  '#dce775', // Y - lima (pentominó)
+  '#ffd700', // SINGLE - dorado (recompensa Tetris)
+  '#78909c', // HOLLOW - gris azulado (reto)
 ];
 
 const PIECES = [
@@ -24,6 +29,22 @@ const PIECES = [
   [[5,5,0],[0,5,5],[0,0,0]],                  // Z
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
+  [[0,8,0],[8,8,8],[0,8,0]],                  // PLUS (pentominó, 5 bloques)
+  [[9,0,9],[9,9,9]],                          // U (pentominó, 5 bloques)
+  [[0,10],[10,10],[0,10],[0,10]],             // Y (pentominó, 5 bloques)
+  [[11]],                                     // SINGLE (recompensa tras Tetris, 1 bloque)
+  [[12,12,12],[12,0,12],[12,12,12]],          // HOLLOW 3x3 (reto, 8 bloques con hueco central)
+];
+
+const NORMAL_TYPES = [1, 2, 3, 4, 5, 6, 7];
+const PENTOMINO_TYPES = [8, 9, 10];
+const CHALLENGE_TYPES = [12];
+const REWARD_TYPE = 11;
+
+const SPAWN_WEIGHTS = [
+  ...NORMAL_TYPES.map(type => ({ type, weight: 10 })),
+  ...PENTOMINO_TYPES.map(type => ({ type, weight: 3 })),
+  ...CHALLENGE_TYPES.map(type => ({ type, weight: 2 })),
 ];
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
@@ -50,10 +71,23 @@ function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 }
 
-function randomPiece() {
-  const type = Math.floor(Math.random() * 7) + 1;
+function createPiece(type) {
   const shape = PIECES[type].map(row => [...row]);
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
+}
+
+function weightedRandomType() {
+  const total = SPAWN_WEIGHTS.reduce((sum, w) => sum + w.weight, 0);
+  let r = Math.random() * total;
+  for (const w of SPAWN_WEIGHTS) {
+    if (r < w.weight) return w.type;
+    r -= w.weight;
+  }
+  return SPAWN_WEIGHTS[0].type;
+}
+
+function randomPiece() {
+  return createPiece(weightedRandomType());
 }
 
 function collide(shape, ox, oy) {
@@ -112,6 +146,10 @@ function clearLines() {
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    if (cleared === 4) {
+      next = createPiece(REWARD_TYPE);
+      drawNext();
+    }
     updateHUD();
   }
 }
