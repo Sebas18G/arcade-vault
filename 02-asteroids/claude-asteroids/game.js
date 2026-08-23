@@ -156,6 +156,7 @@ class Ship {
     this.shootCooldown   = 0;
     this.tripleShotTimer = 0;
     this.shieldTimer     = 0;
+    this.slowMoTimer     = 0;
     this.dead            = false;
   }
 
@@ -165,6 +166,7 @@ class Ship {
     if (this.shootCooldown  > 0) this.shootCooldown  -= dt;
     if (this.tripleShotTimer > 0) this.tripleShotTimer -= dt;
     if (this.shieldTimer    > 0) this.shieldTimer    -= dt;
+    if (this.slowMoTimer    > 0) this.slowMoTimer    -= dt;
 
     const ROT   = 3.5;   // rad/s
     const THRUST = 260;  // px/s²
@@ -283,11 +285,14 @@ class Particle {
   }
 }
 
-// ── Power-up (disparo triple / escudo temporal) ───────────────────────────────
+// ── Power-up (disparo triple / escudo temporal / slow motion) ─────────────────
 const POWERUP_STYLES = {
   triple: { color: '#0ff', label: '3x' },
   shield: { color: '#5c8', label: 'ESC' },
+  slowmo: { color: '#fc5', label: 'x½' },
 };
+const POWERUP_TYPES = Object.keys(POWERUP_STYLES);
+const randomPowerUpType = () => POWERUP_TYPES[randInt(0, POWERUP_TYPES.length - 1)];
 
 class PowerUp {
   constructor(x, y, type = 'triple') {
@@ -416,9 +421,11 @@ function update(dt) {
     bullets.push(...ship.tryShoot());
   }
 
+  const asteroidDt = ship.slowMoTimer > 0 ? dt * 0.5 : dt;
+
   ship.update(dt);
   bullets.forEach(b => b.update(dt));
-  asteroids.forEach(a => a.update(dt));
+  asteroids.forEach(a => a.update(asteroidDt));
   particles.forEach(p => p.update(dt));
   powerups.forEach(p => p.update(dt));
 
@@ -441,8 +448,7 @@ function update(dt) {
         lastKillPos = { x: a.x, y: a.y };
 
         if (!powerupSpawnedThisLevel && Math.random() < POWERUP_CHANCE) {
-          const type = Math.random() < 0.5 ? 'shield' : 'triple';
-          powerups.push(new PowerUp(a.x, a.y, type));
+          powerups.push(new PowerUp(a.x, a.y, randomPowerUpType()));
           powerupSpawnedThisLevel = true;
         }
       }
@@ -453,8 +459,7 @@ function update(dt) {
 
   // Garantía: si el nivel se limpia sin que haya salido el power-up, forzarlo
   if (asteroids.length === 0 && !powerupSpawnedThisLevel && lastKillPos) {
-    const type = Math.random() < 0.5 ? 'shield' : 'triple';
-    powerups.push(new PowerUp(lastKillPos.x, lastKillPos.y, type));
+    powerups.push(new PowerUp(lastKillPos.x, lastKillPos.y, randomPowerUpType()));
     powerupSpawnedThisLevel = true;
   }
 
@@ -481,6 +486,7 @@ function update(dt) {
       if (!p.dead && dist(ship, p) < ship.radius + p.radius) {
         p.dead = true;
         if (p.type === 'shield') ship.shieldTimer = 5;
+        else if (p.type === 'slowmo') ship.slowMoTimer = 6;
         else ship.tripleShotTimer = 8;
       }
     }
@@ -533,6 +539,11 @@ function drawHUD() {
   if (ship.shieldTimer > 0) {
     ctx.fillStyle = '#5c8';
     ctx.fillText(`ESCUDO ${ship.shieldTimer.toFixed(1)}s`, 14, statusY);
+    statusY += 18;
+  }
+  if (ship.slowMoTimer > 0) {
+    ctx.fillStyle = '#fc5';
+    ctx.fillText(`SLOW MOTION ${ship.slowMoTimer.toFixed(1)}s`, 14, statusY);
   }
 }
 
