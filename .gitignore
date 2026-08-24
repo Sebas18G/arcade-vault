@@ -13,3 +13,6 @@ venv/
 # Editor / OS
 .vscode/
 .DS_Store
+
+# Git worktrees
+.trees/
