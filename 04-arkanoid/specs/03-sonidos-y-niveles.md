@@ -1,6 +1,6 @@
 # SPEC 03 — Sonidos y sistema de niveles
 
-> **Status:** aprobado
+> **Status:** implementado
 > **Depends on:** SPEC 01, SPEC 02
 > **Date:** 2026-08-23
 > **Objective:** Agregar efectos de sonido de rebote y rotura de bloques, y un sistema de 15 niveles con velocidad creciente, patrón de color por fila y bloques irrompibles nuevos.
@@ -85,21 +85,21 @@ Conventions:
 
 ## Acceptance criteria
 
-- [ ] Al rebotar la pelota contra cualquier pared, el paddle, o un bloque (rompible o irrompible) se reproduce `ball-bounce.mp3`.
-- [ ] Al romper un bloque rompible se reproduce además `break-sound.mp3`, en el mismo momento en que se suma `BLOCK_SCORE`.
-- [ ] Los sonidos pueden solaparse: romper dos bloques casi al mismo tiempo no corta el sonido del primero.
-- [ ] Los bloques irrompibles nunca desaparecen: la pelota rebota contra ellos indefinidamente sin sumar puntaje ni reproducir `break-sound.mp3`.
-- [ ] El nivel 1 no tiene bloques irrompibles y tiene 6 filas de 10 columnas (60 bloques), igual que SPEC 01.
-- [ ] A partir del nivel 2 aparece una cantidad creciente de bloques irrompibles (`nivel - 1`, tope 8 desde el nivel 9).
-- [ ] La cantidad de filas crece de 6 (niveles 1-3) a 10 (niveles 13-15) según `rowsForLevel()`, manteniendo 10 columnas.
-- [ ] La velocidad inicial de la pelota de cada nivel es un 8% mayor que la del nivel anterior, sin tope.
-- [ ] Cada fila de bloques rompibles tiene un único color, asignado cíclicamente entre los 6 colores de `BLOCK_COLORS`.
-- [ ] Al romper todos los bloques rompibles de un nivel que no es el 15, aparece "NIVEL X COMPLETADO" y el juego espera Enter/Espacio para avanzar, conservando vidas y puntaje.
-- [ ] Al romper todos los bloques rompibles del nivel 15 aparece la pantalla de Victoria existente, no "Nivel completado".
-- [ ] Reiniciar la partida completa (tras Game Over o Victoria) vuelve al nivel 1 con velocidad, filas y bloques irrompibles reseteados.
-- [ ] Perder una vida dentro de un nivel conserva los bloques rompibles ya rotos y los irrompibles ya generados; solo reinicia posición de pelota y paddle.
-- [ ] No hay control de volumen ni de mute visible en el HUD.
-- [ ] Abrir `index.html` y jugar una partida completa (varios niveles, romper bloques, perder vidas) no genera errores en la consola.
+- [x] Al rebotar la pelota contra cualquier pared, el paddle, o un bloque (rompible o irrompible) se reproduce `ball-bounce.mp3`.
+- [x] Al romper un bloque rompible se reproduce además `break-sound.mp3`, en el mismo momento en que se suma `BLOCK_SCORE`.
+- [x] Los sonidos pueden solaparse: romper dos bloques casi al mismo tiempo no corta el sonido del primero.
+- [x] Los bloques irrompibles nunca desaparecen: la pelota rebota contra ellos indefinidamente sin sumar puntaje ni reproducir `break-sound.mp3`.
+- [x] El nivel 1 no tiene bloques irrompibles y tiene 6 filas de 10 columnas (60 bloques), igual que SPEC 01.
+- [x] A partir del nivel 2 aparece una cantidad creciente de bloques irrompibles (`nivel - 1`, tope 8 desde el nivel 9).
+- [x] La cantidad de filas crece de 6 (niveles 1-3) a 10 (niveles 13-15) según `rowsForLevel()`, manteniendo 10 columnas.
+- [x] La velocidad inicial de la pelota de cada nivel es un 8% mayor que la del nivel anterior, sin tope.
+- [x] Cada fila de bloques rompibles tiene un único color, asignado cíclicamente entre los 6 colores de `BLOCK_COLORS`.
+- [x] Al romper todos los bloques rompibles de un nivel que no es el 15, aparece "NIVEL X COMPLETADO" y el juego espera Enter/Espacio para avanzar, conservando vidas y puntaje.
+- [x] Al romper todos los bloques rompibles del nivel 15 aparece la pantalla de Victoria existente, no "Nivel completado".
+- [x] Reiniciar la partida completa (tras Game Over o Victoria) vuelve al nivel 1 con velocidad, filas y bloques irrompibles reseteados.
+- [x] Perder una vida dentro de un nivel conserva los bloques rompibles ya rotos y los irrompibles ya generados; solo reinicia posición de pelota y paddle.
+- [x] No hay control de volumen ni de mute visible en el HUD.
+- [x] Abrir `index.html` y jugar una partida completa (varios niveles, romper bloques, perder vidas) no genera errores en la consola.
 
 ## Decisions
 
