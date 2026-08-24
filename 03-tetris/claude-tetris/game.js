@@ -25,6 +25,28 @@ const COLORS = [
   '#4fc3f7', // FREEZE - celeste hielo
 ];
 
+// Paleta suave usada por el skin "Pastel" (mismos índices 1-17 que COLORS, solo reinterpreta el color).
+const PASTEL_COLORS = [
+  null,
+  '#a8dadc', // I
+  '#ffe8a3', // O
+  '#d8bfd8', // T
+  '#b5e8b0', // S
+  '#f5b8b8', // Z
+  '#b8d4f0', // J
+  '#ffcc99', // L
+  '#f7c6d9', // PLUS
+  '#c5cae9', // U
+  '#eef2a8', // Y
+  '#fff2b2', // SINGLE
+  '#c8d0d8', // HOLLOW
+  '#ffb3a1', // BOMB
+  '#fff6b3', // LIGHTNING
+  '#f0b3f7', // DYE
+  '#d2b8a8', // GRAVITY
+  '#b3e0f7', // FREEZE
+];
+
 const PIECES = [
   null,
   [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], // I
@@ -91,7 +113,17 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const continueBtn = document.getElementById('continue-btn');
+const playBtn = document.getElementById('play-btn');
+const nameEntry = document.getElementById('name-entry');
+const playerNameInput = document.getElementById('player-name-input');
+const saveScoreBtn = document.getElementById('save-score-btn');
+const highscoresSection = document.getElementById('highscores-section');
+const highscoreListEl = document.getElementById('highscore-list');
+const bestComboStatEl = document.getElementById('best-combo-stat');
+const bestLinesStatEl = document.getElementById('best-lines-stat');
+const resetScoresBtn = document.getElementById('reset-scores-btn');
 const themeSwitch = document.getElementById('theme-switch');
+const skinSelect = document.getElementById('skin-select');
 const nextLabelEl = document.getElementById('next-label');
 const powerupToastEl = document.getElementById('powerup-toast');
 const freezeStatusSection = document.getElementById('freeze-status-section');
@@ -99,13 +131,27 @@ const freezeStatusEl = document.getElementById('freeze-status');
 const comboStatusSection = document.getElementById('combo-status-section');
 const comboStatusEl = document.getElementById('combo-status');
 const comboToastEl = document.getElementById('combo-toast');
+const pauseMenu = document.getElementById('pause-menu');
+const startLevelSelect = document.getElementById('start-level-select');
+const controlsToggleBtn = document.getElementById('controls-toggle-btn');
+const pauseControlsList = document.getElementById('pause-controls-list');
 
 const THEME_KEY = 'tetris-theme';
+const START_LEVEL_KEY = 'tetris-start-level';
+const HIGHSCORES_KEY = 'tetris-highscores';
+const BEST_STATS_KEY = 'tetris-best-stats';
+const MAX_HIGHSCORES = 5;
 let gridColor = '#22222e';
+let startLevel = 1;
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+const SKIN_KEY = 'tetris-skin';
+const VALID_SKINS = ['retro', 'neon', 'pastel', 'pixel'];
+let currentSkin = 'retro';
+
+let board, current, next, score, lines, level, paused, gameOver, started, lastTime, dropAccum, dropInterval, animId;
 let linesSincePowerUp, powerUpThreshold, lastPowerUpType, freezeRemaining, toastTimeoutId;
 let comboCount, backToBackActive, lastActionRotation, comboToastTimeoutId, boardFlashTimeoutId, audioCtx;
+let currentGameMaxCombo;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -128,6 +174,10 @@ function weightedRandomType() {
 
 function randomPiece() {
   return createPiece(weightedRandomType());
+}
+
+function dropIntervalForLevel(lvl) {
+  return Math.max(100, 1000 - (lvl - 1) * 90);
 }
 
 function rollPowerUpThreshold(lvl) {
@@ -225,6 +275,7 @@ function clearLines(isTSpin) {
 
   lines += cleared;
   comboCount++;
+  if (comboCount > currentGameMaxCombo) currentGameMaxCombo = comboCount;
 
   let clearScore = ((isTSpin ? T_SPIN_SCORES[cleared] : LINE_SCORES[cleared]) || 0) * level;
   clearScore *= comboCount;
@@ -241,8 +292,8 @@ function clearLines(isTSpin) {
     score += (PERFECT_CLEAR_SCORES[cleared] || PERFECT_CLEAR_SCORES[4]) * level;
   }
 
-  level = Math.floor(lines / 10) + 1;
-  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  level = startLevel + Math.floor(lines / 10);
+  dropInterval = dropIntervalForLevel(level);
   linesSincePowerUp += cleared;
 
   if (cleared === 4) {
@@ -503,6 +554,24 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
+  switch (currentSkin) {
+    case 'neon':
+      drawBlockNeon(context, x, y, colorIndex, size, alpha);
+      break;
+    case 'pastel':
+      drawBlockPastel(context, x, y, colorIndex, size, alpha);
+      break;
+    case 'pixel':
+      drawBlockPixel(context, x, y, colorIndex, size, alpha);
+      break;
+    default:
+      drawBlockRetro(context, x, y, colorIndex, size, alpha);
+      break;
+  }
+}
+
+// Skin "Retro": comportamiento original de drawBlock, sin cambios.
+function drawBlockRetro(context, x, y, colorIndex, size, alpha) {
   const color = COLORS[colorIndex];
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
@@ -513,8 +582,98 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
   context.globalAlpha = 1;
 }
 
+// Skin "Neon": fondo negro (ver drawBackground) + resplandor (shadowBlur/shadowColor) alrededor de cada bloque.
+function drawBlockNeon(context, x, y, colorIndex, size, alpha) {
+  const color = COLORS[colorIndex];
+  context.save();
+  context.globalAlpha = alpha ?? 1;
+  context.shadowBlur = size * 0.5;
+  context.shadowColor = color;
+  context.fillStyle = color;
+  context.fillRect(x * size + 3, y * size + 3, size - 6, size - 6);
+  context.shadowBlur = 0;
+  context.strokeStyle = 'rgba(255,255,255,0.7)';
+  context.lineWidth = 1;
+  context.strokeRect(x * size + 3, y * size + 3, size - 6, size - 6);
+  context.restore();
+}
+
+// Skin "Pastel": paleta suave (PASTEL_COLORS) + bordes redondeados (ctx.roundRect, con fallback manual).
+function drawBlockPastel(context, x, y, colorIndex, size, alpha) {
+  const color = PASTEL_COLORS[colorIndex] || COLORS[colorIndex];
+  const px = x * size + 2;
+  const py = y * size + 2;
+  const w = size - 4;
+  const h = size - 4;
+  const r = Math.min(6, w / 2, h / 2);
+  context.save();
+  context.globalAlpha = alpha ?? 1;
+  context.fillStyle = color;
+  roundedRectPath(context, px, py, w, h, r);
+  context.fill();
+  // highlight suave en la mitad superior
+  context.fillStyle = 'rgba(255,255,255,0.35)';
+  roundedRectPath(context, px, py, w, Math.max(2, h * 0.35), r);
+  context.fill();
+  context.restore();
+}
+
+// Traza un rectángulo con esquinas redondeadas en `context`, usando ctx.roundRect si está
+// disponible y un fallback manual con quadraticCurveTo si no (Safari antiguo, etc.).
+function roundedRectPath(context, x, y, w, h, r) {
+  context.beginPath();
+  if (typeof context.roundRect === 'function') {
+    context.roundRect(x, y, w, h, r);
+    return;
+  }
+  context.moveTo(x + r, y);
+  context.lineTo(x + w - r, y);
+  context.quadraticCurveTo(x + w, y, x + w, y + r);
+  context.lineTo(x + w, y + h - r);
+  context.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  context.lineTo(x + r, y + h);
+  context.quadraticCurveTo(x, y + h, x, y + h - r);
+  context.lineTo(x, y + r);
+  context.quadraticCurveTo(x, y, x + r, y);
+  context.closePath();
+}
+
+// Skin "Pixel art": relleno plano + patrón de dithering (cuadrícula fina a cuadros) encima.
+function drawBlockPixel(context, x, y, colorIndex, size, alpha) {
+  const color = COLORS[colorIndex];
+  const px = x * size + 1;
+  const py = y * size + 1;
+  const w = size - 2;
+  const h = size - 2;
+  context.save();
+  context.globalAlpha = alpha ?? 1;
+  context.fillStyle = color;
+  context.fillRect(px, py, w, h);
+  const cell = Math.max(2, Math.floor(size / 8));
+  context.fillStyle = 'rgba(0,0,0,0.18)';
+  for (let iy = 0; iy < h; iy += cell) {
+    for (let ix = 0; ix < w; ix += cell) {
+      if (((ix / cell) + (iy / cell)) % 2 === 0) {
+        context.fillRect(px + ix, py + iy, Math.min(cell, w - ix), Math.min(cell, h - iy));
+      }
+    }
+  }
+  context.strokeStyle = 'rgba(0,0,0,0.35)';
+  context.lineWidth = 1;
+  context.strokeRect(px + 0.5, py + 0.5, w - 1, h - 1);
+  context.restore();
+}
+
+// Skin "Neon": pinta el fondo de negro antes de la cuadrícula/bloques.
+function drawBackground(context, w, h) {
+  if (currentSkin === 'neon') {
+    context.fillStyle = '#000000';
+    context.fillRect(0, 0, w, h);
+  }
+}
+
 function drawGrid() {
-  ctx.strokeStyle = gridColor;
+  ctx.strokeStyle = currentSkin === 'neon' ? 'rgba(255,255,255,0.08)' : gridColor;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -532,6 +691,7 @@ function drawGrid() {
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground(ctx, canvas.width, canvas.height);
   drawGrid();
 
   // board
@@ -555,6 +715,7 @@ function draw() {
 function drawNext() {
   const NB = 30;
   nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+  drawBackground(nextCtx, nextCanvas.width, nextCanvas.height);
   const shape = next.shape;
   const offX = Math.floor((4 - shape[0].length) / 2);
   const offY = Math.floor((4 - shape.length) / 2);
@@ -564,27 +725,175 @@ function drawNext() {
   nextLabelEl.textContent = POWERUP_LABELS[next.type] || '';
 }
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function loadHighscores() {
+  const parsed = loadJSON(HIGHSCORES_KEY, []);
+  if (!Array.isArray(parsed)) return [];
+  // Sanea cada entrada: descarta las que no tengan un score numérico válido
+  // (localStorage puede ser editado a mano o compartido con otro código del
+  // mismo origen) y normaliza el resto para que renderHighscores() nunca
+  // reciba un valor que rompa .toLocaleString() o se filtre sin escapar.
+  return parsed
+    .filter(e => e && typeof e === 'object' && typeof e.score === 'number' && isFinite(e.score))
+    .map(e => ({
+      name: typeof e.name === 'string' && e.name ? e.name : 'AAA',
+      score: e.score,
+      maxCombo: typeof e.maxCombo === 'number' && isFinite(e.maxCombo) ? e.maxCombo : 0,
+      lines: typeof e.lines === 'number' && isFinite(e.lines) ? e.lines : 0,
+    }));
+}
+
+function saveHighscores(list) {
+  localStorage.setItem(HIGHSCORES_KEY, JSON.stringify(list));
+}
+
+function scoreQualifies(candidateScore) {
+  const list = loadHighscores();
+  if (list.length < MAX_HIGHSCORES) return true;
+  return candidateScore > list[list.length - 1].score;
+}
+
+function addHighscore(entry) {
+  const list = loadHighscores();
+  list.push(entry);
+  list.sort((a, b) => b.score - a.score);
+  const top = list.slice(0, MAX_HIGHSCORES);
+  saveHighscores(top);
+  return top;
+}
+
+function renderHighscores(highlightEntry, list) {
+  list = list || loadHighscores();
+  highscoreListEl.innerHTML = '';
+  if (list.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'highscore-empty';
+    li.textContent = 'Sin récords todavía';
+    highscoreListEl.appendChild(li);
+    return;
+  }
+  list.forEach((entry, i) => {
+    const li = document.createElement('li');
+    li.className = 'highscore-row';
+    if (highlightEntry && entry === highlightEntry) li.classList.add('highscore-row-new');
+    li.innerHTML = `<span class="hs-rank">${i + 1}</span><span class="hs-name">${escapeHtml(entry.name)}</span><span class="hs-score">${entry.score.toLocaleString()}</span>`;
+    highscoreListEl.appendChild(li);
+  });
+}
+
+function loadBestStats() {
+  const parsed = loadJSON(BEST_STATS_KEY, null);
+  if (!parsed || typeof parsed !== 'object') return { bestCombo: 0, maxLines: 0 };
+  return {
+    bestCombo: typeof parsed.bestCombo === 'number' && isFinite(parsed.bestCombo) ? parsed.bestCombo : 0,
+    maxLines: typeof parsed.maxLines === 'number' && isFinite(parsed.maxLines) ? parsed.maxLines : 0,
+  };
+}
+
+function saveBestStats(stats) {
+  localStorage.setItem(BEST_STATS_KEY, JSON.stringify(stats));
+}
+
+function renderBestStats() {
+  const stats = loadBestStats();
+  bestComboStatEl.textContent = stats.bestCombo > 0 ? `x${stats.bestCombo}` : '-';
+  bestLinesStatEl.textContent = stats.maxLines > 0 ? stats.maxLines : '-';
+}
+
+function updateBestStatsAfterGame() {
+  const stats = loadBestStats();
+  let changed = false;
+  if (currentGameMaxCombo > stats.bestCombo) { stats.bestCombo = currentGameMaxCombo; changed = true; }
+  if (lines > stats.maxLines) { stats.maxLines = lines; changed = true; }
+  if (changed) saveBestStats(stats);
+  renderBestStats();
+}
+
+function resetHighscores() {
+  localStorage.removeItem(HIGHSCORES_KEY);
+  localStorage.removeItem(BEST_STATS_KEY);
+  renderHighscores(null);
+  renderBestStats();
+}
+
+function confirmHighscoreName() {
+  const name = playerNameInput.value.trim().slice(0, 12) || 'AAA';
+  const entry = { name, score, maxCombo: currentGameMaxCombo, lines };
+  const top = addHighscore(entry);
+  nameEntry.classList.add('hidden');
+  renderHighscores(entry, top);
+}
+
+function showStartScreen() {
+  started = false;
+  overlayTitle.textContent = 'TETRIS';
+  overlayScore.textContent = '';
+  nameEntry.classList.add('hidden');
+  highscoresSection.hidden = false;
+  renderHighscores(null);
+  renderBestStats();
+  playBtn.hidden = false;
+  continueBtn.hidden = true;
+  restartBtn.hidden = true;
+  overlay.classList.remove('hidden');
+}
+
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()}`;
+  playBtn.hidden = true;
   continueBtn.hidden = true;
+  pauseMenu.classList.add('hidden');
+  restartBtn.hidden = false;
+  updateBestStatsAfterGame();
+  highscoresSection.hidden = false;
+  renderHighscores(null);
+  if (scoreQualifies(score)) {
+    nameEntry.classList.remove('hidden');
+    playerNameInput.value = '';
+    setTimeout(() => playerNameInput.focus(), 0);
+  } else {
+    nameEntry.classList.add('hidden');
+  }
   overlay.classList.remove('hidden');
 }
 
 function togglePause() {
-  if (gameOver) return;
+  if (!started || gameOver) return;
   paused = !paused;
   if (!paused) {
     overlay.classList.add('hidden');
+    pauseMenu.classList.add('hidden');
     lastTime = performance.now();
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
     overlayTitle.textContent = 'PAUSA';
     overlayScore.textContent = '';
+    nameEntry.classList.add('hidden');
+    highscoresSection.hidden = true;
+    playBtn.hidden = true;
     continueBtn.hidden = false;
+    pauseMenu.classList.remove('hidden');
+    pauseControlsList.classList.add('hidden');
+    controlsToggleBtn.textContent = 'Ver controles ▾';
+    restartBtn.hidden = false;
     overlay.classList.remove('hidden');
   }
 }
@@ -624,10 +933,12 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  level = startLevel;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  started = true;
+  currentGameMaxCombo = 0;
+  dropInterval = dropIntervalForLevel(level);
   dropAccum = 0;
   lastTime = performance.now();
   linesSincePowerUp = 0;
@@ -650,14 +961,20 @@ function init() {
   next = randomPiece();
   spawn();
   updateHUD();
+  nameEntry.classList.add('hidden');
+  playerNameInput.value = '';
+  highscoresSection.hidden = true;
+  playBtn.hidden = true;
+  continueBtn.hidden = true;
+  restartBtn.hidden = true;
   overlay.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
-  if (paused || gameOver) return;
+  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (!started || paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) { current.x--; lastActionRotation = false; }
@@ -682,6 +999,28 @@ document.addEventListener('keydown', e => {
 
 restartBtn.addEventListener('click', init);
 continueBtn.addEventListener('click', () => { if (paused) togglePause(); });
+playBtn.addEventListener('click', init);
+resetScoresBtn.addEventListener('click', resetHighscores);
+saveScoreBtn.addEventListener('click', confirmHighscoreName);
+playerNameInput.addEventListener('keydown', e => {
+  if (e.code === 'Enter') { e.preventDefault(); confirmHighscoreName(); }
+});
+
+controlsToggleBtn.addEventListener('click', () => {
+  const isHidden = pauseControlsList.classList.toggle('hidden');
+  controlsToggleBtn.textContent = isHidden ? 'Ver controles ▾' : 'Ocultar controles ▴';
+});
+
+function applyStartLevel(lvl) {
+  startLevel = lvl;
+  startLevelSelect.value = String(lvl);
+}
+
+startLevelSelect.addEventListener('change', () => {
+  const lvl = parseInt(startLevelSelect.value, 10);
+  applyStartLevel(lvl);
+  localStorage.setItem(START_LEVEL_KEY, String(lvl));
+});
 
 function applyTheme(theme) {
   document.body.classList.toggle('light-theme', theme === 'light');
@@ -697,4 +1036,24 @@ themeSwitch.addEventListener('change', () => {
 
 applyTheme(localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark');
 
-init();
+const storedStartLevel = parseInt(localStorage.getItem(START_LEVEL_KEY), 10);
+applyStartLevel(Number.isInteger(storedStartLevel) && storedStartLevel >= 1 && storedStartLevel <= 10 ? storedStartLevel : 1);
+
+function applySkin(skin) {
+  currentSkin = VALID_SKINS.includes(skin) ? skin : 'retro';
+  if (skinSelect) skinSelect.value = currentSkin;
+  // Si el juego ya está inicializado, refleja el cambio de skin en el próximo frame
+  // forzando un redibujado inmediato (sin esperar al loop, por si está en pausa).
+  if (board && current) draw();
+  if (next) drawNext();
+}
+
+skinSelect.addEventListener('change', () => {
+  const skin = skinSelect.value;
+  applySkin(skin);
+  localStorage.setItem(SKIN_KEY, skin);
+});
+
+applySkin(localStorage.getItem(SKIN_KEY));
+
+showStartScreen();
