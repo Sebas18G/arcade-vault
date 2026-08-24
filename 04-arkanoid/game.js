@@ -15,12 +15,41 @@ const state = {
   blocks: [], // { row, col, x, y, w, h, color, alive: true }
 };
 
+const PADDLE_SPEED = 7;
+const keys = { left: false, right: false };
+
+function clampPaddleX( x ) {
+  return Math.max( 0, Math.min( canvas.width - state.paddle.w, x ) );
+}
+
+window.addEventListener( 'keydown', ( e ) => {
+  if ( e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' ) keys.left = true;
+  if ( e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' ) keys.right = true;
+} );
+
+window.addEventListener( 'keyup', ( e ) => {
+  if ( e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' ) keys.left = false;
+  if ( e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' ) keys.right = false;
+} );
+
+canvas.addEventListener( 'mousemove', ( e ) => {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  state.paddle.x = clampPaddleX( mouseX - state.paddle.w / 2 );
+} );
+
+function updatePaddle() {
+  if ( keys.left ) state.paddle.x = clampPaddleX( state.paddle.x - PADDLE_SPEED );
+  if ( keys.right ) state.paddle.x = clampPaddleX( state.paddle.x + PADDLE_SPEED );
+}
+
 function draw() {
   ctx.clearRect( 0, 0, canvas.width, canvas.height );
   drawSprite( ctx, 'paddle', state.paddle.x, state.paddle.y, state.paddle.w, state.paddle.h );
 }
 
 function loop() {
+  updatePaddle();
   draw();
   requestAnimationFrame( loop );
 }
