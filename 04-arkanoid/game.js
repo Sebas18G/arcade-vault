@@ -3,6 +3,16 @@ const ctx = canvas.getContext( '2d' );
 
 const BG_COLOR = '#1414a0';
 
+const SOUNDS = {
+  bounce: 'assets/sounds/ball-bounce.mp3',
+  break: 'assets/sounds/break-sound.mp3',
+};
+
+function playSound( name ) {
+  const audio = new Audio( SOUNDS[ name ] );
+  audio.play().catch( () => {} );
+}
+
 const BLOCK_COLORS = [ 'gray', 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
 const GRID_COLS = 10;
 const GRID_ROWS = 6;
@@ -103,19 +113,23 @@ function updateBall() {
   if ( b.x - b.r <= 0 ) {
     b.x = b.r;
     b.vx *= -1;
+    playSound( 'bounce' );
   } else if ( b.x + b.r >= canvas.width ) {
     b.x = canvas.width - b.r;
     b.vx *= -1;
+    playSound( 'bounce' );
   }
 
   if ( b.y - b.r <= 0 ) {
     b.y = b.r;
     b.vy *= -1;
+    playSound( 'bounce' );
   }
 
   if ( b.vy > 0 && collidesWithRect( b, state.paddle ) ) {
     b.y = state.paddle.y - b.r;
     b.vy *= -1;
+    playSound( 'bounce' );
   }
 
   checkBlockCollisions();
@@ -168,6 +182,8 @@ function checkBlockCollisions() {
       startTime: performance.now(),
     } );
     bounceOffBlock( b, block );
+    playSound( 'bounce' );
+    playSound( 'break' );
     if ( state.blocks.every( ( bl ) => !bl.alive ) ) {
       state.pendingVictory = true;
     }
