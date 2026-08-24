@@ -1,6 +1,31 @@
 const canvas = document.getElementById( 'game' );
 const ctx = canvas.getContext( '2d' );
 
+function createBackgroundPattern() {
+  const size = 32;
+  const pc = document.createElement( 'canvas' );
+  pc.width = size;
+  pc.height = size;
+  const pctx = pc.getContext( '2d' );
+
+  pctx.fillStyle = '#1414a0';
+  pctx.fillRect( 0, 0, size, size );
+
+  pctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  pctx.lineWidth = 2;
+  [ [ 0, size, size, 0 ], [ -size / 2, size / 2, size / 2, -size / 2 ], [ size / 2, size * 1.5, size * 1.5, size / 2 ] ]
+    .forEach( ( [ x1, y1, x2, y2 ] ) => {
+      pctx.beginPath();
+      pctx.moveTo( x1, y1 );
+      pctx.lineTo( x2, y2 );
+      pctx.stroke();
+    } );
+
+  return ctx.createPattern( pc, 'repeat' );
+}
+
+const BG_PATTERN = createBackgroundPattern();
+
 const BLOCK_COLORS = [ 'gray', 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
 const GRID_COLS = 10;
 const GRID_ROWS = 6;
@@ -162,7 +187,8 @@ function checkBlockCollisions() {
 }
 
 function draw() {
-  ctx.clearRect( 0, 0, canvas.width, canvas.height );
+  ctx.fillStyle = BG_PATTERN;
+  ctx.fillRect( 0, 0, canvas.width, canvas.height );
   drawSprite( ctx, 'paddle', state.paddle.x, state.paddle.y, state.paddle.w, state.paddle.h );
   const b = state.ball;
   drawSprite( ctx, 'ball', b.x - b.r, b.y - b.r, b.r * 2, b.r * 2 );
@@ -207,13 +233,20 @@ function drawVictoryScreen() {
 }
 
 function drawHUD() {
-  ctx.fillStyle = '#fff';
-  ctx.font = '20px sans-serif';
+  ctx.font = 'bold 22px "Courier New", monospace';
   ctx.textBaseline = 'top';
+  ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+  ctx.shadowBlur = 6;
+
+  ctx.fillStyle = '#fff';
   ctx.textAlign = 'left';
-  ctx.fillText( `Puntaje: ${ state.score }`, 10, 10 );
+  ctx.fillText( `PUNTAJE ${ state.score }`, 10, 10 );
+
+  ctx.fillStyle = '#ff3b3b';
   ctx.textAlign = 'right';
-  ctx.fillText( `Vidas: ${ state.lives }`, canvas.width - 10, 10 );
+  ctx.fillText( `VIDAS ${ state.lives }`, canvas.width - 10, 10 );
+
+  ctx.shadowBlur = 0;
 }
 
 function loop() {
