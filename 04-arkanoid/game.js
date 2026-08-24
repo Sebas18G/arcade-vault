@@ -96,10 +96,12 @@ function updateBall() {
     b.vy *= -1;
   }
 
-  if ( b.vy > 0 && collidesWithPaddle( b, state.paddle ) ) {
+  if ( b.vy > 0 && collidesWithRect( b, state.paddle ) ) {
     b.y = state.paddle.y - b.r;
     b.vy *= -1;
   }
+
+  checkBlockCollisions();
 
   if ( b.y - b.r > canvas.height ) {
     state.lives -= 1;
@@ -107,12 +109,39 @@ function updateBall() {
   }
 }
 
-function collidesWithPaddle( b, p ) {
-  const closestX = Math.max( p.x, Math.min( b.x, p.x + p.w ) );
-  const closestY = Math.max( p.y, Math.min( b.y, p.y + p.h ) );
+function collidesWithRect( b, r ) {
+  const closestX = Math.max( r.x, Math.min( b.x, r.x + r.w ) );
+  const closestY = Math.max( r.y, Math.min( b.y, r.y + r.h ) );
   const dx = b.x - closestX;
   const dy = b.y - closestY;
   return ( dx * dx + dy * dy ) <= b.r * b.r;
+}
+
+function bounceOffBlock( b, block ) {
+  const overlapLeft = ( b.x + b.r ) - block.x;
+  const overlapRight = ( block.x + block.w ) - ( b.x - b.r );
+  const overlapTop = ( b.y + b.r ) - block.y;
+  const overlapBottom = ( block.y + block.h ) - ( b.y - b.r );
+  const minOverlapX = Math.min( overlapLeft, overlapRight );
+  const minOverlapY = Math.min( overlapTop, overlapBottom );
+
+  if ( minOverlapX < minOverlapY ) {
+    b.vx *= -1;
+  } else {
+    b.vy *= -1;
+  }
+}
+
+function checkBlockCollisions() {
+  const b = state.ball;
+  for ( const block of state.blocks ) {
+    if ( !block.alive ) continue;
+    if ( !collidesWithRect( b, block ) ) continue;
+    block.alive = false;
+    state.score += BLOCK_SCORE;
+    bounceOffBlock( b, block );
+    break;
+  }
 }
 
 function draw() {
