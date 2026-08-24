@@ -198,6 +198,17 @@ function checkBlockCollisions() {
   }
 }
 
+function updateExplosions() {
+  state.explosions = state.explosions.filter( ( ex ) => {
+    const elapsed = performance.now() - ex.startTime;
+    return elapsed < EXPLOSION_DURATION;
+  } );
+
+  if ( state.pendingVictory && state.explosions.length === 0 ) {
+    state.screen = 'victory';
+  }
+}
+
 function draw() {
   ctx.fillStyle = BG_PATTERN;
   ctx.fillRect( 0, 0, canvas.width, canvas.height );
@@ -265,6 +276,7 @@ function loop() {
   if ( state.screen === 'playing' ) {
     updatePaddle();
     updateBall();
+    updateExplosions();
   }
   draw();
   requestAnimationFrame( loop );
