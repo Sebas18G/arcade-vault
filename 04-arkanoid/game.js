@@ -207,21 +207,28 @@ function checkBlockCollisions() {
   for ( const block of state.blocks ) {
     if ( !block.alive ) continue;
     if ( !collidesWithRect( b, block ) ) continue;
-    block.alive = false;
-    state.score += BLOCK_SCORE;
-    state.explosions.push( {
-      x: block.x,
-      y: block.y,
-      w: block.w,
-      h: block.h,
-      color: block.color,
-      startTime: performance.now(),
-    } );
     bounceOffBlock( b, block );
     playSound( 'bounce' );
-    playSound( 'break' );
-    if ( state.blocks.every( ( bl ) => !bl.alive ) ) {
-      state.pendingVictory = true;
+    if ( block.breakable ) {
+      block.alive = false;
+      state.score += BLOCK_SCORE;
+      state.explosions.push( {
+        x: block.x,
+        y: block.y,
+        w: block.w,
+        h: block.h,
+        color: block.color,
+        startTime: performance.now(),
+      } );
+      playSound( 'break' );
+      const breakableCleared = state.blocks.filter( ( bl ) => bl.breakable ).every( ( bl ) => !bl.alive );
+      if ( breakableCleared ) {
+        if ( state.level === MAX_LEVEL ) {
+          state.pendingVictory = true;
+        } else {
+          state.pendingLevelComplete = true;
+        }
+      }
     }
     break;
   }
