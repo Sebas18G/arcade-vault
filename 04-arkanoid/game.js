@@ -3,10 +3,33 @@ const ctx = canvas.getContext( '2d' );
 
 const BG_COLOR = '#1414a0';
 
-const BLOCK_COLORS = [ 'gray', 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
+const SOUNDS = {
+  bounce: 'assets/sounds/ball-bounce.mp3',
+  break: 'assets/sounds/break-sound.mp3',
+};
+
+function playSound( name ) {
+  const audio = new Audio( SOUNDS[ name ] );
+  audio.play().catch( () => {} );
+}
+
+const BLOCK_COLORS = [ 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
+const INDESTRUCTIBLE_TEXTURES = [ 'wood', 'brick_red', 'stone', 'brick_dark' ];
 const GRID_COLS = 10;
-const GRID_ROWS = 6;
 const BLOCK_SCORE = 10;
+const MAX_LEVEL = 15;
+
+function rowsForLevel( level ) {
+  return Math.min( 6 + Math.floor( ( level - 1 ) / 3 ), 10 );
+}
+
+function indestructibleCountForLevel( level ) {
+  return Math.min( level - 1, 8 );
+}
+
+function speedMultiplierForLevel( level ) {
+  return 1 + 0.08 * ( level - 1 );
+}
 
 const BLOCK_W = 76;
 const BLOCK_H = 24;
@@ -18,34 +41,53 @@ const INITIAL_PADDLE = { x: 350, y: 570, w: 100, h: 16 };
 const INITIAL_BALL = { x: 400, y: 300, vx: 4, vy: -4, r: 8 };
 
 const state = {
-  screen: 'playing', // 'playing' | 'gameover' | 'victory'
+  screen: 'playing', // 'playing' | 'gameover' | 'victory' | 'levelcomplete'
   lives: 3,
   score: 0,
+  level: 1,
   paddle: { ...INITIAL_PADDLE },
   ball: { ...INITIAL_BALL },
-  blocks: [], // { row, col, x, y, w, h, color, alive: true }
+  blocks: [], // { row, col, x, y, w, h, alive, breakable, color? } | { ..., breakable: false, texture }
   explosions: [], // { x, y, w, h, color, startTime }
   pendingVictory: false,
+  pendingLevelComplete: false,
 };
 
 function resetPositions() {
   state.paddle = { ...INITIAL_PADDLE };
-  state.ball = { ...INITIAL_BALL };
+  const speedMul = speedMultiplierForLevel( state.level );
+  state.ball = {
+    ...INITIAL_BALL,
+    vx: INITIAL_BALL.vx * speedMul,
+    vy: INITIAL_BALL.vy * speedMul,
+  };
+}
+
+function advanceLevel() {
+  state.level += 1;
+  state.blocks = generateBlocks( state.level );
+  state.explosions = [];
+  state.pendingLevelComplete = false;
+  resetPositions();
+  state.screen = 'playing';
 }
 
 function resetGame() {
   state.lives = 3;
   state.score = 0;
-  state.blocks = generateBlocks();
+  state.level = 1;
+  state.blocks = generateBlocks( state.level );
   state.explosions = [];
   state.pendingVictory = false;
+  state.pendingLevelComplete = false;
   state.screen = 'playing';
   resetPositions();
 }
 
-function generateBlocks() {
+function generateBlocks( level ) {
+  const rows = rowsForLevel( level );
   const blocks = [];
-  for ( let row = 0; row < GRID_ROWS; row++ ) {
+  for ( let row = 0; row < rows; row++ ) {
     for ( let col = 0; col < GRID_COLS; col++ ) {
       blocks.push( {
         row,
@@ -54,15 +96,28 @@ function generateBlocks() {
         y: BLOCK_MARGIN_TOP + row * ( BLOCK_H + BLOCK_GAP ),
         w: BLOCK_W,
         h: BLOCK_H,
-        color: BLOCK_COLORS[ Math.floor( Math.random() * BLOCK_COLORS.length ) ],
         alive: true,
+        breakable: true,
+        color: BLOCK_COLORS[ row % BLOCK_COLORS.length ],
       } );
     }
   }
+
+  const remainingIndices = blocks.map( ( _, i ) => i );
+  const indestructibleCount = indestructibleCountForLevel( level );
+  for ( let i = 0; i < indestructibleCount; i++ ) {
+    const pick = Math.floor( Math.random() * remainingIndices.length );
+    const blockIndex = remainingIndices.splice( pick, 1 )[ 0 ];
+    const block = blocks[ blockIndex ];
+    block.breakable = false;
+    delete block.color;
+    block.texture = INDESTRUCTIBLE_TEXTURES[ Math.floor( Math.random() * INDESTRUCTIBLE_TEXTURES.length ) ];
+  }
+
   return blocks;
 }
 
-state.blocks = generateBlocks();
+state.blocks = generateBlocks( state.level );
 
 const PADDLE_SPEED = 7;
 const keys = { left: false, right: false };
@@ -76,6 +131,9 @@ window.addEventListener( 'keydown', ( e ) => {
   if ( e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' ) keys.right = true;
   if ( ( state.screen === 'gameover' || state.screen === 'victory' ) && ( e.key === 'Enter' || e.key === ' ' ) ) {
     resetGame();
+  }
+  if ( state.screen === 'levelcomplete' && ( e.key === 'Enter' || e.key === ' ' ) ) {
+    advanceLevel();
   }
 } );
 
@@ -103,19 +161,23 @@ function updateBall() {
   if ( b.x - b.r <= 0 ) {
     b.x = b.r;
     b.vx *= -1;
+    playSound( 'bounce' );
   } else if ( b.x + b.r >= canvas.width ) {
     b.x = canvas.width - b.r;
     b.vx *= -1;
+    playSound( 'bounce' );
   }
 
   if ( b.y - b.r <= 0 ) {
     b.y = b.r;
     b.vy *= -1;
+    playSound( 'bounce' );
   }
 
   if ( b.vy > 0 && collidesWithRect( b, state.paddle ) ) {
     b.y = state.paddle.y - b.r;
     b.vy *= -1;
+    playSound( 'bounce' );
   }
 
   checkBlockCollisions();
@@ -157,19 +219,28 @@ function checkBlockCollisions() {
   for ( const block of state.blocks ) {
     if ( !block.alive ) continue;
     if ( !collidesWithRect( b, block ) ) continue;
-    block.alive = false;
-    state.score += BLOCK_SCORE;
-    state.explosions.push( {
-      x: block.x,
-      y: block.y,
-      w: block.w,
-      h: block.h,
-      color: block.color,
-      startTime: performance.now(),
-    } );
     bounceOffBlock( b, block );
-    if ( state.blocks.every( ( bl ) => !bl.alive ) ) {
-      state.pendingVictory = true;
+    playSound( 'bounce' );
+    if ( block.breakable ) {
+      block.alive = false;
+      state.score += BLOCK_SCORE;
+      state.explosions.push( {
+        x: block.x,
+        y: block.y,
+        w: block.w,
+        h: block.h,
+        color: block.color,
+        startTime: performance.now(),
+      } );
+      playSound( 'break' );
+      const breakableCleared = state.blocks.filter( ( bl ) => bl.breakable ).every( ( bl ) => !bl.alive );
+      if ( breakableCleared ) {
+        if ( state.level === MAX_LEVEL ) {
+          state.pendingVictory = true;
+        } else {
+          state.pendingLevelComplete = true;
+        }
+      }
     }
     break;
   }
@@ -181,8 +252,12 @@ function updateExplosions() {
     return elapsed < EXPLOSION_DURATION;
   } );
 
-  if ( state.pendingVictory && state.explosions.length === 0 ) {
-    state.screen = 'victory';
+  if ( state.explosions.length === 0 ) {
+    if ( state.pendingVictory ) {
+      state.screen = 'victory';
+    } else if ( state.pendingLevelComplete ) {
+      state.screen = 'levelcomplete';
+    }
   }
 }
 
@@ -203,7 +278,8 @@ function draw() {
   drawSprite( ctx, 'ball', b.x - b.r, b.y - b.r, b.r * 2, b.r * 2 );
   for ( const block of state.blocks ) {
     if ( !block.alive ) continue;
-    drawSprite( ctx, `block_${ block.color }`, block.x, block.y, block.w, block.h );
+    const spriteName = block.breakable ? `block_${ block.color }` : `indestructible_${ block.texture }`;
+    drawSprite( ctx, spriteName, block.x, block.y, block.w, block.h );
   }
   drawExplosions();
   drawHUD();
@@ -213,6 +289,9 @@ function draw() {
   }
   if ( state.screen === 'victory' ) {
     drawVictoryScreen();
+  }
+  if ( state.screen === 'levelcomplete' ) {
+    drawLevelCompleteScreen();
   }
 }
 
@@ -242,6 +321,19 @@ function drawVictoryScreen() {
   ctx.fillText( 'Presiona Enter o Espacio para reiniciar', canvas.width / 2, canvas.height / 2 + 20 );
 }
 
+function drawLevelCompleteScreen() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect( 0, 0, canvas.width, canvas.height );
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '48px sans-serif';
+  ctx.fillText( `NIVEL ${ state.level } COMPLETADO`, canvas.width / 2, canvas.height / 2 - 30 );
+  ctx.font = '20px sans-serif';
+  ctx.fillText( 'Presiona Enter o Espacio para continuar', canvas.width / 2, canvas.height / 2 + 20 );
+}
+
 function drawHUD() {
   ctx.font = 'bold 22px "Courier New", monospace';
   ctx.textBaseline = 'top';
@@ -251,6 +343,10 @@ function drawHUD() {
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'left';
   ctx.fillText( `PUNTAJE ${ state.score }`, 10, 10 );
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.fillText( `NIVEL ${ state.level } / ${ MAX_LEVEL }`, canvas.width / 2, 10 );
 
   ctx.fillStyle = '#ff3b3b';
   ctx.textAlign = 'right';
