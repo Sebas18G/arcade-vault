@@ -182,9 +182,17 @@ function checkBlockCollisions() {
     if ( !collidesWithRect( b, block ) ) continue;
     block.alive = false;
     state.score += BLOCK_SCORE;
+    state.explosions.push( {
+      x: block.x,
+      y: block.y,
+      w: block.w,
+      h: block.h,
+      color: block.color,
+      startTime: performance.now(),
+    } );
     bounceOffBlock( b, block );
     if ( state.blocks.every( ( bl ) => !bl.alive ) ) {
-      state.screen = 'victory';
+      state.pendingVictory = true;
     }
     break;
   }
