@@ -14,9 +14,22 @@ function playSound( name ) {
 }
 
 const BLOCK_COLORS = [ 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
+const INDESTRUCTIBLE_TEXTURES = [ 'wood', 'brick_red', 'stone', 'brick_dark' ];
 const GRID_COLS = 10;
-const GRID_ROWS = 6;
 const BLOCK_SCORE = 10;
+const MAX_LEVEL = 15;
+
+function rowsForLevel( level ) {
+  return Math.min( 6 + Math.floor( ( level - 1 ) / 3 ), 10 );
+}
+
+function indestructibleCountForLevel( level ) {
+  return Math.min( level - 1, 8 );
+}
+
+function speedMultiplierForLevel( level ) {
+  return 1 + 0.08 * ( level - 1 );
+}
 
 const BLOCK_W = 76;
 const BLOCK_H = 24;
@@ -31,31 +44,41 @@ const state = {
   screen: 'playing', // 'playing' | 'gameover' | 'victory'
   lives: 3,
   score: 0,
+  level: 1,
   paddle: { ...INITIAL_PADDLE },
   ball: { ...INITIAL_BALL },
-  blocks: [], // { row, col, x, y, w, h, color, alive: true }
+  blocks: [], // { row, col, x, y, w, h, alive, breakable, color? } | { ..., breakable: false, texture }
   explosions: [], // { x, y, w, h, color, startTime }
   pendingVictory: false,
+  pendingLevelComplete: false,
 };
 
 function resetPositions() {
   state.paddle = { ...INITIAL_PADDLE };
-  state.ball = { ...INITIAL_BALL };
+  const speedMul = speedMultiplierForLevel( state.level );
+  state.ball = {
+    ...INITIAL_BALL,
+    vx: INITIAL_BALL.vx * speedMul,
+    vy: INITIAL_BALL.vy * speedMul,
+  };
 }
 
 function resetGame() {
   state.lives = 3;
   state.score = 0;
-  state.blocks = generateBlocks();
+  state.level = 1;
+  state.blocks = generateBlocks( state.level );
   state.explosions = [];
   state.pendingVictory = false;
+  state.pendingLevelComplete = false;
   state.screen = 'playing';
   resetPositions();
 }
 
-function generateBlocks() {
+function generateBlocks( level ) {
+  const rows = rowsForLevel( level );
   const blocks = [];
-  for ( let row = 0; row < GRID_ROWS; row++ ) {
+  for ( let row = 0; row < rows; row++ ) {
     for ( let col = 0; col < GRID_COLS; col++ ) {
       blocks.push( {
         row,
@@ -64,15 +87,28 @@ function generateBlocks() {
         y: BLOCK_MARGIN_TOP + row * ( BLOCK_H + BLOCK_GAP ),
         w: BLOCK_W,
         h: BLOCK_H,
-        color: BLOCK_COLORS[ Math.floor( Math.random() * BLOCK_COLORS.length ) ],
         alive: true,
+        breakable: true,
+        color: BLOCK_COLORS[ row % BLOCK_COLORS.length ],
       } );
     }
   }
+
+  const remainingIndices = blocks.map( ( _, i ) => i );
+  const indestructibleCount = indestructibleCountForLevel( level );
+  for ( let i = 0; i < indestructibleCount; i++ ) {
+    const pick = Math.floor( Math.random() * remainingIndices.length );
+    const blockIndex = remainingIndices.splice( pick, 1 )[ 0 ];
+    const block = blocks[ blockIndex ];
+    block.breakable = false;
+    delete block.color;
+    block.texture = INDESTRUCTIBLE_TEXTURES[ Math.floor( Math.random() * INDESTRUCTIBLE_TEXTURES.length ) ];
+  }
+
   return blocks;
 }
 
-state.blocks = generateBlocks();
+state.blocks = generateBlocks( state.level );
 
 const PADDLE_SPEED = 7;
 const keys = { left: false, right: false };
