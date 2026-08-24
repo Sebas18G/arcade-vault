@@ -153,6 +153,17 @@ function draw() {
     if ( !block.alive ) continue;
     drawSprite( ctx, `block_${ block.color }`, block.x, block.y, block.w, block.h );
   }
+  drawHUD();
+}
+
+function drawHUD() {
+  ctx.fillStyle = '#fff';
+  ctx.font = '20px sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  ctx.fillText( `Puntaje: ${ state.score }`, 10, 10 );
+  ctx.textAlign = 'right';
+  ctx.fillText( `Vidas: ${ state.lives }`, canvas.width - 10, 10 );
 }
 
 function loop() {
