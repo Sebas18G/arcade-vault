@@ -278,7 +278,8 @@ function draw() {
   drawSprite( ctx, 'ball', b.x - b.r, b.y - b.r, b.r * 2, b.r * 2 );
   for ( const block of state.blocks ) {
     if ( !block.alive ) continue;
-    drawSprite( ctx, `block_${ block.color }`, block.x, block.y, block.w, block.h );
+    const spriteName = block.breakable ? `block_${ block.color }` : `indestructible_${ block.texture }`;
+    drawSprite( ctx, spriteName, block.x, block.y, block.w, block.h );
   }
   drawExplosions();
   drawHUD();
@@ -342,6 +343,10 @@ function drawHUD() {
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'left';
   ctx.fillText( `PUNTAJE ${ state.score }`, 10, 10 );
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.fillText( `NIVEL ${ state.level } / ${ MAX_LEVEL }`, canvas.width / 2, 10 );
 
   ctx.fillStyle = '#ff3b3b';
   ctx.textAlign = 'right';
