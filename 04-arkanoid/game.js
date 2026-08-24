@@ -41,7 +41,7 @@ const INITIAL_PADDLE = { x: 350, y: 570, w: 100, h: 16 };
 const INITIAL_BALL = { x: 400, y: 300, vx: 4, vy: -4, r: 8 };
 
 const state = {
-  screen: 'playing', // 'playing' | 'gameover' | 'victory'
+  screen: 'playing', // 'playing' | 'gameover' | 'victory' | 'levelcomplete'
   lives: 3,
   score: 0,
   level: 1,
@@ -61,6 +61,15 @@ function resetPositions() {
     vx: INITIAL_BALL.vx * speedMul,
     vy: INITIAL_BALL.vy * speedMul,
   };
+}
+
+function advanceLevel() {
+  state.level += 1;
+  state.blocks = generateBlocks( state.level );
+  state.explosions = [];
+  state.pendingLevelComplete = false;
+  resetPositions();
+  state.screen = 'playing';
 }
 
 function resetGame() {
@@ -122,6 +131,9 @@ window.addEventListener( 'keydown', ( e ) => {
   if ( e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' ) keys.right = true;
   if ( ( state.screen === 'gameover' || state.screen === 'victory' ) && ( e.key === 'Enter' || e.key === ' ' ) ) {
     resetGame();
+  }
+  if ( state.screen === 'levelcomplete' && ( e.key === 'Enter' || e.key === ' ' ) ) {
+    advanceLevel();
   }
 } );
 
@@ -240,8 +252,12 @@ function updateExplosions() {
     return elapsed < EXPLOSION_DURATION;
   } );
 
-  if ( state.pendingVictory && state.explosions.length === 0 ) {
-    state.screen = 'victory';
+  if ( state.explosions.length === 0 ) {
+    if ( state.pendingVictory ) {
+      state.screen = 'victory';
+    } else if ( state.pendingLevelComplete ) {
+      state.screen = 'levelcomplete';
+    }
   }
 }
 
@@ -273,6 +289,9 @@ function draw() {
   if ( state.screen === 'victory' ) {
     drawVictoryScreen();
   }
+  if ( state.screen === 'levelcomplete' ) {
+    drawLevelCompleteScreen();
+  }
 }
 
 function drawGameOverScreen() {
@@ -299,6 +318,19 @@ function drawVictoryScreen() {
   ctx.fillText( '¡VICTORIA!', canvas.width / 2, canvas.height / 2 - 30 );
   ctx.font = '20px sans-serif';
   ctx.fillText( 'Presiona Enter o Espacio para reiniciar', canvas.width / 2, canvas.height / 2 + 20 );
+}
+
+function drawLevelCompleteScreen() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect( 0, 0, canvas.width, canvas.height );
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '48px sans-serif';
+  ctx.fillText( `NIVEL ${ state.level } COMPLETADO`, canvas.width / 2, canvas.height / 2 - 30 );
+  ctx.font = '20px sans-serif';
+  ctx.fillText( 'Presiona Enter o Espacio para continuar', canvas.width / 2, canvas.height / 2 + 20 );
 }
 
 function drawHUD() {
