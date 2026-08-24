@@ -1,30 +1,7 @@
 const canvas = document.getElementById( 'game' );
 const ctx = canvas.getContext( '2d' );
 
-function createBackgroundPattern() {
-  const size = 32;
-  const pc = document.createElement( 'canvas' );
-  pc.width = size;
-  pc.height = size;
-  const pctx = pc.getContext( '2d' );
-
-  pctx.fillStyle = '#1414a0';
-  pctx.fillRect( 0, 0, size, size );
-
-  pctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-  pctx.lineWidth = 2;
-  [ [ 0, size, size, 0 ], [ -size / 2, size / 2, size / 2, -size / 2 ], [ size / 2, size * 1.5, size * 1.5, size / 2 ] ]
-    .forEach( ( [ x1, y1, x2, y2 ] ) => {
-      pctx.beginPath();
-      pctx.moveTo( x1, y1 );
-      pctx.lineTo( x2, y2 );
-      pctx.stroke();
-    } );
-
-  return ctx.createPattern( pc, 'repeat' );
-}
-
-const BG_PATTERN = createBackgroundPattern();
+const BG_COLOR = '#1414a0';
 
 const BLOCK_COLORS = [ 'gray', 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
 const GRID_COLS = 10;
@@ -219,7 +196,7 @@ function drawExplosions() {
 }
 
 function draw() {
-  ctx.fillStyle = BG_PATTERN;
+  ctx.fillStyle = BG_COLOR;
   ctx.fillRect( 0, 0, canvas.width, canvas.height );
   drawSprite( ctx, 'paddle', state.paddle.x, state.paddle.y, state.paddle.w, state.paddle.h );
   const b = state.ball;

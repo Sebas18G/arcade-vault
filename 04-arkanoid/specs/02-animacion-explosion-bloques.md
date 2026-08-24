@@ -1,6 +1,6 @@
 # SPEC 02 — Animación de explosión al romper bloques
 
-> **Status:** aprobado
+> **Status:** implementado
 > **Depends on:** SPEC 01
 > **Date:** 2026-08-23
 > **Objective:** Reemplazar la desaparición instantánea de los bloques por una animación de explosión de 4 frames usando `EXPLOSION_FRAMES`, sin agregar sonido.
@@ -52,15 +52,15 @@ Conventions:
 
 ## Acceptance criteria
 
-- [ ] Al golpear un bloque vivo, en su posición se reproduce una animación de 4 frames (`EXPLOSION_FRAMES[color]`) antes de desaparecer por completo, en vez de desaparecer instantáneamente.
-- [ ] La animación completa dura 150ms (`EXPLOSION_DURATION`) repartidos en 4 frames iguales.
-- [ ] El puntaje aumenta en `BLOCK_SCORE` en el momento del golpe, sin esperar a que termine la animación.
-- [ ] La pelota y el resto del juego siguen funcionando con normalidad mientras hay una o más explosiones en pantalla (no hay pausa).
-- [ ] Pueden verse varias explosiones simultáneas en pantalla si se rompe más de un bloque en un intervalo corto.
-- [ ] Al romper el último bloque, la pantalla de Victoria aparece recién cuando termina de reproducirse la animación de explosión de ese bloque, no en el mismo frame en que se rompe.
-- [ ] Reiniciar la partida (tras Game Over o Victoria) deja `state.explosions` vacío y no arrastra animaciones de la partida anterior.
-- [ ] El juego no reproduce ningún sonido asociado a la explosión.
-- [ ] Abrir `index.html` y jugar una partida completa no genera errores en la consola del navegador.
+- [x] Al golpear un bloque vivo, en su posición se reproduce una animación de 4 frames (`EXPLOSION_FRAMES[color]`) antes de desaparecer por completo, en vez de desaparecer instantáneamente.
+- [x] La animación completa dura 150ms (`EXPLOSION_DURATION`) repartidos en 4 frames iguales.
+- [x] El puntaje aumenta en `BLOCK_SCORE` en el momento del golpe, sin esperar a que termine la animación.
+- [x] La pelota y el resto del juego siguen funcionando con normalidad mientras hay una o más explosiones en pantalla (no hay pausa).
+- [x] Pueden verse varias explosiones simultáneas en pantalla si se rompe más de un bloque en un intervalo corto.
+- [x] Al romper el último bloque, la pantalla de Victoria aparece recién cuando termina de reproducirse la animación de explosión de ese bloque, no en el mismo frame en que se rompe.
+- [x] Reiniciar la partida (tras Game Over o Victoria) deja `state.explosions` vacío y no arrastra animaciones de la partida anterior.
+- [x] El juego no reproduce ningún sonido asociado a la explosión.
+- [x] Abrir `index.html` y jugar una partida completa no genera errores en la consola del navegador.
 
 ## Decisions
 
