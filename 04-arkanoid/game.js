@@ -47,6 +47,8 @@ const state = {
   paddle: { ...INITIAL_PADDLE },
   ball: { ...INITIAL_BALL },
   blocks: [], // { row, col, x, y, w, h, color, alive: true }
+  explosions: [], // { x, y, w, h, color, startTime }
+  pendingVictory: false,
 };
 
 function resetPositions() {
@@ -58,6 +60,8 @@ function resetGame() {
   state.lives = 3;
   state.score = 0;
   state.blocks = generateBlocks();
+  state.explosions = [];
+  state.pendingVictory = false;
   state.screen = 'playing';
   resetPositions();
 }
