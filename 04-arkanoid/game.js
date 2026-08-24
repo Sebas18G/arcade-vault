@@ -1,30 +1,7 @@
 const canvas = document.getElementById( 'game' );
 const ctx = canvas.getContext( '2d' );
 
-function createBackgroundPattern() {
-  const size = 32;
-  const pc = document.createElement( 'canvas' );
-  pc.width = size;
-  pc.height = size;
-  const pctx = pc.getContext( '2d' );
-
-  pctx.fillStyle = '#1414a0';
-  pctx.fillRect( 0, 0, size, size );
-
-  pctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-  pctx.lineWidth = 2;
-  [ [ 0, size, size, 0 ], [ -size / 2, size / 2, size / 2, -size / 2 ], [ size / 2, size * 1.5, size * 1.5, size / 2 ] ]
-    .forEach( ( [ x1, y1, x2, y2 ] ) => {
-      pctx.beginPath();
-      pctx.moveTo( x1, y1 );
-      pctx.lineTo( x2, y2 );
-      pctx.stroke();
-    } );
-
-  return ctx.createPattern( pc, 'repeat' );
-}
-
-const BG_PATTERN = createBackgroundPattern();
+const BG_COLOR = '#1414a0';
 
 const BLOCK_COLORS = [ 'gray', 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
 const GRID_COLS = 10;
@@ -47,6 +24,8 @@ const state = {
   paddle: { ...INITIAL_PADDLE },
   ball: { ...INITIAL_BALL },
   blocks: [], // { row, col, x, y, w, h, color, alive: true }
+  explosions: [], // { x, y, w, h, color, startTime }
+  pendingVictory: false,
 };
 
 function resetPositions() {
@@ -58,6 +37,8 @@ function resetGame() {
   state.lives = 3;
   state.score = 0;
   state.blocks = generateBlocks();
+  state.explosions = [];
+  state.pendingVictory = false;
   state.screen = 'playing';
   resetPositions();
 }
@@ -178,16 +159,44 @@ function checkBlockCollisions() {
     if ( !collidesWithRect( b, block ) ) continue;
     block.alive = false;
     state.score += BLOCK_SCORE;
+    state.explosions.push( {
+      x: block.x,
+      y: block.y,
+      w: block.w,
+      h: block.h,
+      color: block.color,
+      startTime: performance.now(),
+    } );
     bounceOffBlock( b, block );
     if ( state.blocks.every( ( bl ) => !bl.alive ) ) {
-      state.screen = 'victory';
+      state.pendingVictory = true;
     }
     break;
   }
 }
 
+function updateExplosions() {
+  state.explosions = state.explosions.filter( ( ex ) => {
+    const elapsed = performance.now() - ex.startTime;
+    return elapsed < EXPLOSION_DURATION;
+  } );
+
+  if ( state.pendingVictory && state.explosions.length === 0 ) {
+    state.screen = 'victory';
+  }
+}
+
+function drawExplosions() {
+  for ( const ex of state.explosions ) {
+    const elapsed = performance.now() - ex.startTime;
+    const frameIndex = Math.min( 3, Math.floor( elapsed / ( EXPLOSION_DURATION / 4 ) ) );
+    const frame = EXPLOSION_FRAMES[ ex.color ][ frameIndex ];
+    drawFrame( ctx, frame, ex.x, ex.y, ex.w, ex.h );
+  }
+}
+
 function draw() {
-  ctx.fillStyle = BG_PATTERN;
+  ctx.fillStyle = BG_COLOR;
   ctx.fillRect( 0, 0, canvas.width, canvas.height );
   drawSprite( ctx, 'paddle', state.paddle.x, state.paddle.y, state.paddle.w, state.paddle.h );
   const b = state.ball;
@@ -196,6 +205,7 @@ function draw() {
     if ( !block.alive ) continue;
     drawSprite( ctx, `block_${ block.color }`, block.x, block.y, block.w, block.h );
   }
+  drawExplosions();
   drawHUD();
 
   if ( state.screen === 'gameover' ) {
@@ -253,6 +263,7 @@ function loop() {
   if ( state.screen === 'playing' ) {
     updatePaddle();
     updateBall();
+    updateExplosions();
   }
   draw();
   requestAnimationFrame( loop );

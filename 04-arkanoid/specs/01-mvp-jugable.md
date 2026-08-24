@@ -1,6 +1,6 @@
 # SPEC 01 — MVP jugable de Arkanoid
 
-> **Status:** aprobado
+> **Status:** implementado
 > **Depends on:** (ninguno)
 > **Date:** 2026-08-23
 > **Objective:** Implementar el primer MVP jugable de Arkanoid: paddle, pelota, un nivel fijo de bloques, vidas, puntaje y pantallas de fin de partida.
@@ -72,18 +72,18 @@ Convenciones:
 
 ## Acceptance criteria
 
-- [ ] Abrir `index.html` no genera errores en la consola del navegador.
-- [ ] El paddle se mueve con las flechas del teclado (y/o A/D) y con el movimiento del mouse.
-- [ ] La pelota rebota en las paredes izquierda, derecha y superior del canvas.
-- [ ] La pelota rebota al tocar el paddle.
-- [ ] Al caer la pelota por debajo del paddle se resta una vida y se reinicia la posición de pelota y paddle sin borrar los bloques ya rotos.
-- [ ] El nivel muestra una cuadrícula de 10 columnas x 6 filas (60 bloques) con colores asignados al azar entre los 7 disponibles en `SPRITES.blocks`.
-- [ ] Al golpear un bloque vivo, este desaparece inmediatamente y el puntaje aumenta en `BLOCK_SCORE`.
-- [ ] El puntaje y las vidas restantes se muestran en pantalla en todo momento durante la partida.
-- [ ] Al llegar a 0 vidas se muestra la pantalla de Game Over con una opción que reinicia la partida completa (vidas, puntaje y bloques).
-- [ ] Al romper los 60 bloques se muestra la pantalla de Victoria con una opción que reinicia la partida completa.
-- [ ] El juego no reproduce ningún sonido ni muestra pantalla de inicio o de pausa.
-- [ ] El canvas tiene un marco/bezel oscuro visible y un fondo azul texturizado dentro del área de juego; el HUD de puntaje/vidas usa tipografía monoespaciada en mayúsculas, sin mostrar `HIGH SCORE` ni persistir puntaje.
+- [x] Abrir `index.html` no genera errores en la consola del navegador.
+- [x] El paddle se mueve con las flechas del teclado (y/o A/D) y con el movimiento del mouse.
+- [x] La pelota rebota en las paredes izquierda, derecha y superior del canvas.
+- [x] La pelota rebota al tocar el paddle.
+- [x] Al caer la pelota por debajo del paddle se resta una vida y se reinicia la posición de pelota y paddle sin borrar los bloques ya rotos.
+- [x] El nivel muestra una cuadrícula de 10 columnas x 6 filas (60 bloques) con colores asignados al azar entre los 7 disponibles en `SPRITES.blocks`.
+- [x] Al golpear un bloque vivo, este desaparece inmediatamente y el puntaje aumenta en `BLOCK_SCORE`.
+- [x] El puntaje y las vidas restantes se muestran en pantalla en todo momento durante la partida.
+- [x] Al llegar a 0 vidas se muestra la pantalla de Game Over con una opción que reinicia la partida completa (vidas, puntaje y bloques).
+- [x] Al romper los 60 bloques se muestra la pantalla de Victoria con una opción que reinicia la partida completa.
+- [x] El juego no reproduce ningún sonido ni muestra pantalla de inicio o de pausa.
+- [x] El canvas tiene un marco/bezel oscuro visible y un fondo azul texturizado dentro del área de juego; el HUD de puntaje/vidas usa tipografía monoespaciada en mayúsculas, sin mostrar `HIGH SCORE` ni persistir puntaje.
 
 ## Decisions
 
