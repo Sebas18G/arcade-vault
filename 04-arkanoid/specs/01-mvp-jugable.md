@@ -1,6 +1,6 @@
 # SPEC 01 — MVP jugable de Arkanoid
 
-> **Status:** aprobado
+> **Status:** implementado
 > **Depends on:** (ninguno)
 > **Date:** 2026-08-23
 > **Objective:** Implementar el primer MVP jugable de Arkanoid: paddle, pelota, un nivel fijo de bloques, vidas, puntaje y pantallas de fin de partida.
