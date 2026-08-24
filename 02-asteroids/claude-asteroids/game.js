@@ -16,11 +16,28 @@ const levelDecBtn = document.getElementById('level-dec');
 const levelIncBtn = document.getElementById('level-inc');
 const levelValueEl = document.getElementById('level-value');
 
+const startOverlay = document.getElementById('start-overlay');
+const startBtn = document.getElementById('start-btn');
+const startLeaderboardEl = document.getElementById('start-leaderboard');
+const resetRecordsBtn = document.getElementById('reset-records-btn');
+
+const gameoverOverlay = document.getElementById('gameover-overlay');
+const gameoverScoreEl = document.getElementById('gameover-score');
+const gameoverStatsEl = document.getElementById('gameover-stats');
+const qualifyMsg = document.getElementById('qualify-msg');
+const nameEntryBox = document.getElementById('name-entry');
+const playerNameInput = document.getElementById('player-name-input');
+const saveScoreBtn = document.getElementById('save-score-btn');
+const gameoverLeaderboardEl = document.getElementById('gameover-leaderboard');
+const gameoverRestartBtn = document.getElementById('gameover-restart-btn');
+const resetRecordsBtn2 = document.getElementById('reset-records-btn-2');
+
 // ── Input ─────────────────────────────────────────────────────────────────────
 const keys = {};
 const justPressed = {};
 
 window.addEventListener('keydown', e => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code))
     e.preventDefault();
   // Con el menú de pausa abierto, solo P/ESC deben llegar al juego — el resto de
@@ -30,7 +47,10 @@ window.addEventListener('keydown', e => {
   justPressed[e.code] = !keys[e.code];
   keys[e.code] = true;
 });
-window.addEventListener('keyup', e => { keys[e.code] = false; });
+window.addEventListener('keyup', e => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  keys[e.code] = false;
+});
 
 function pressed(code) {
   const val = justPressed[code];
@@ -377,16 +397,105 @@ class PowerUp {
   }
 }
 
+// ── Tabla de récords (localStorage) ─────────────────────────────────────────────
+const LEADERBOARD_KEY  = 'asteroids_leaderboard_v1';
+const PLAYER_NAME_KEY  = 'asteroids_player_name';
+const MAX_ENTRIES       = 5;
+const COMBO_WINDOW      = 1.5; // segundos entre kills para mantener vivo el combo
+
+function loadLeaderboard() {
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLeaderboardList(list) {
+  try { localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(list)); } catch { /* localStorage no disponible */ }
+}
+
+function loadPlayerName() {
+  try { return localStorage.getItem(PLAYER_NAME_KEY) || ''; } catch { return ''; }
+}
+
+function savePlayerName(name) {
+  try { localStorage.setItem(PLAYER_NAME_KEY, name); } catch { /* localStorage no disponible */ }
+}
+
+// Puesto (1-based) que ocuparía `score` en el top 5 actual, o null si no entra.
+function getRankForScore(sc) {
+  const list = loadLeaderboard();
+  if (list.length < MAX_ENTRIES) return list.length + 1;
+  for (let i = 0; i < list.length; i++) {
+    if (sc > list[i].score) return i + 1;
+  }
+  return null;
+}
+
+function addLeaderboardEntry(name, sc, lvl, destroyed, combo) {
+  const entry = { id: Date.now() + Math.random(), name, score: sc, level: lvl, destroyed, combo };
+  const list = loadLeaderboard();
+  list.push(entry);
+  list.sort((a, b) => b.score - a.score);
+  list.length = Math.min(list.length, MAX_ENTRIES);
+  saveLeaderboardList(list);
+  return entry;
+}
+
+function resetRecords() {
+  if (!confirm('¿Seguro que quieres borrar todos los récords guardados?')) return;
+  saveLeaderboardList([]);
+  renderLeaderboard(startLeaderboardEl, null);
+  renderLeaderboard(gameoverLeaderboardEl, null);
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
+
+function renderLeaderboard(container, highlightId) {
+  const list = loadLeaderboard();
+  if (list.length === 0) {
+    container.innerHTML = '<p class="leaderboard-empty">Sin récords todavía — ¡sé el primero!</p>';
+    return;
+  }
+  const rows = list.map((e, i) => `
+    <tr class="${e.id === highlightId ? 'highlight' : ''}">
+      <td>${i + 1}</td>
+      <td>${escapeHtml(e.name)}</td>
+      <td>${e.score}</td>
+      <td>${e.level}</td>
+      <td>${e.destroyed}</td>
+      <td>x${e.combo}</td>
+    </tr>`).join('');
+  container.innerHTML = `
+    <table class="leaderboard-table">
+      <thead>
+        <tr><th>#</th><th>Nombre</th><th>Puntaje</th><th>Nivel</th><th>Destr.</th><th>Combo</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 // ── Estado del juego ──────────────────────────────────────────────────────────
 let ship, bullets, asteroids, particles, powerups;
 let score, lives, level;
-let state;      // 'playing' | 'dead' | 'gameover'
+let state = 'start'; // 'start' | 'playing' | 'dead' | 'gameover'
 let deadTimer;
 let paused = false;
 let powerupsSpawnedThisLevel; // cuántos power-ups han salido ya en el nivel actual
 let maxPowerupsThisLevel;     // tope de power-ups para el nivel actual (escala con la dificultad)
 let novaFlash = 0;     // temporizador de la onda expansiva visual de la bomba nova
 let novaOrigin = null; // punto donde se activó la última bomba nova
+let comboCount = 0;          // racha actual de kills seguidos dentro de la ventana de combo
+let comboTimer = 0;          // tiempo restante antes de que la racha se rompa
+let bestCombo = 0;           // mayor combo alcanzado en la partida actual
+let asteroidsDestroyed = 0;  // total de asteroides destruidos en la partida actual
 
 // Nivel con el que arrancará la próxima partida, elegido desde el menú de pausa.
 const MIN_START_LEVEL = 1;
@@ -424,7 +533,57 @@ function initGame() {
   maxPowerupsThisLevel     = computeMaxPowerups(level);
   novaFlash  = 0;
   novaOrigin = null;
+  comboCount = 0;
+  comboTimer = 0;
+  bestCombo  = 0;
+  asteroidsDestroyed = 0;
   spawnAsteroids(3 + level);
+}
+
+// Oculta ambos overlays de menú y arranca (o reinicia) la partida.
+function startGame() {
+  startOverlay.classList.add('hidden');
+  gameoverOverlay.classList.add('hidden');
+  initGame();
+}
+
+// Registra un asteroide destruido: alimenta tanto el contador total como el combo.
+function registerKill() {
+  asteroidsDestroyed++;
+  comboCount++;
+  comboTimer = COMBO_WINDOW;
+  if (comboCount > bestCombo) bestCombo = comboCount;
+}
+
+function onGameOver() {
+  gameoverScoreEl.textContent = `PUNTAJE: ${score}`;
+  gameoverStatsEl.textContent =
+    `NIVEL MÁXIMO: ${level}   ·   ASTEROIDES DESTRUIDOS: ${asteroidsDestroyed}   ·   MEJOR COMBO: x${bestCombo}`;
+
+  const rank = getRankForScore(score);
+  if (rank) {
+    qualifyMsg.textContent = `¡Nuevo récord! Entraste al puesto #${rank}. Ingresa tu nombre:`;
+    nameEntryBox.classList.remove('hidden');
+    playerNameInput.value = loadPlayerName();
+    renderLeaderboard(gameoverLeaderboardEl, null);
+    setTimeout(() => playerNameInput.focus(), 0);
+  } else {
+    qualifyMsg.textContent = 'No alcanzaste el Top 5 esta vez.';
+    nameEntryBox.classList.add('hidden');
+    renderLeaderboard(gameoverLeaderboardEl, null);
+  }
+
+  gameoverOverlay.classList.remove('hidden');
+}
+
+function saveScore() {
+  const name = (playerNameInput.value || '').trim().slice(0, 12).toUpperCase() || 'JUGADOR';
+  savePlayerName(name);
+  const entry = addLeaderboardEntry(name, score, level, asteroidsDestroyed, bestCombo);
+  nameEntryBox.classList.add('hidden');
+  qualifyMsg.textContent = `¡Guardado, ${name}!`;
+  renderLeaderboard(gameoverLeaderboardEl, entry.id);
+  renderLeaderboard(startLeaderboardEl, entry.id);
 }
 
 function nextLevel() {
@@ -450,6 +609,7 @@ function triggerNovaBomb() {
     if (dist(ship, a) > NOVA_BLAST_RADIUS) continue;
     a.dead = true;
     score += POINTS[a.size];
+    registerKill();
     explode(a.x, a.y, a.size * 6);
   }
   asteroids = asteroids.filter(a => !a.dead);
@@ -463,6 +623,7 @@ function killShip() {
   lives--;
   if (lives <= 0) {
     state = 'gameover';
+    onGameOver();
   } else {
     state     = 'dead';
     deadTimer = 2;
@@ -477,7 +638,7 @@ function clearInputState() {
 }
 
 function togglePause() {
-  if (state === 'gameover') return;
+  if (state === 'gameover' || state === 'start') return;
   paused = !paused;
   overlay.classList.toggle('hidden', !paused);
   if (paused) {
@@ -510,11 +671,16 @@ function changeStartLevel(delta) {
 
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
+  if (state === 'start') {
+    if (pressed('Space')) startGame();
+    return;
+  }
+
   if (pressed('KeyP') || pressed('Escape')) togglePause();
   if (paused) return;
 
   if (state === 'gameover') {
-    if (pressed('Space')) initGame();
+    if (pressed('Space')) startGame();
     particles.forEach(p => p.update(dt));
     particles = particles.filter(p => !p.dead);
     return;
@@ -532,6 +698,11 @@ function update(dt) {
   // Disparar
   if (pressed('Space')) {
     bullets.push(...ship.tryShoot());
+  }
+
+  if (comboTimer > 0) {
+    comboTimer -= dt;
+    if (comboTimer <= 0) comboCount = 0;
   }
 
   const asteroidDt = ship.slowMoTimer > 0 ? dt * 0.5 : dt;
@@ -556,6 +727,7 @@ function update(dt) {
         b.dead = true;
         a.dead = true;
         score += POINTS[a.size];
+        registerKill();
         explode(a.x, a.y, a.size * 5);
         newAsteroids.push(...a.split());
         lastKillPos = { x: a.x, y: a.y };
@@ -647,6 +819,13 @@ function drawHUD() {
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
 
+  // Estadísticas de la partida: mejor combo y total de asteroides destruidos
+  ctx.textAlign = 'right';
+  ctx.font = '12px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fillText(`MEJOR COMBO x${bestCombo}`, W - 14, 44);
+  ctx.fillText(`DESTRUIDOS ${asteroidsDestroyed}`, W - 14, 60);
+
   ctx.textAlign = 'left';
   ctx.font = '12px monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
@@ -654,6 +833,11 @@ function drawHUD() {
 
   ctx.font = '13px monospace';
   let statusY = 46;
+  if (comboCount > 1) {
+    ctx.fillStyle = '#ff9d3f';
+    ctx.fillText(`COMBO x${comboCount}`, 14, statusY);
+    statusY += 18;
+  }
   if (ship.tripleShotTimer > 0) {
     ctx.fillStyle = '#0ff';
     ctx.fillText(`TRIPLE SHOT ${ship.tripleShotTimer.toFixed(1)}s`, 14, statusY);
@@ -675,19 +859,11 @@ function drawHUD() {
   }
 }
 
-function drawOverlay(title, sub) {
-  ctx.textAlign   = 'center';
-  ctx.fillStyle   = '#fff';
-  ctx.font        = 'bold 46px monospace';
-  ctx.fillText(title, W / 2, H / 2 - 18);
-  ctx.font        = '18px monospace';
-  ctx.fillStyle   = 'rgba(255,255,255,0.65)';
-  ctx.fillText(sub, W / 2, H / 2 + 22);
-}
-
 function draw() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
+
+  if (state === 'start') return; // la pantalla de inicio la maneja el overlay DOM
 
   particles.forEach(p => p.draw());
   asteroids.forEach(a => a.draw());
@@ -708,9 +884,6 @@ function draw() {
   }
 
   drawHUD();
-
-  if (state === 'gameover')
-    drawOverlay('GAME OVER', `PUNTAJE: ${score}   —   ESPACIO PARA REINICIAR`);
 }
 
 // ── Loop principal ────────────────────────────────────────────────────────────
@@ -729,7 +902,7 @@ restartBtn.addEventListener('click', () => {
   paused = false;
   overlay.classList.add('hidden');
   clearInputState();
-  initGame();
+  startGame();
 });
 controlsBtn.addEventListener('click', showPauseControls);
 backBtn.addEventListener('click', showPauseMain);
@@ -737,5 +910,15 @@ levelDecBtn.addEventListener('click', () => changeStartLevel(-1));
 levelIncBtn.addEventListener('click', () => changeStartLevel(1));
 
 updateLevelSelectUI();
-initGame();
+
+startBtn.addEventListener('click', startGame);
+resetRecordsBtn.addEventListener('click', resetRecords);
+resetRecordsBtn2.addEventListener('click', resetRecords);
+gameoverRestartBtn.addEventListener('click', startGame);
+saveScoreBtn.addEventListener('click', saveScore);
+playerNameInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); saveScore(); }
+});
+
+renderLeaderboard(startLeaderboardEl, null);
 requestAnimationFrame(loop);
