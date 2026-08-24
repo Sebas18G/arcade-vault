@@ -68,7 +68,7 @@ function clampPaddleX( x ) {
 window.addEventListener( 'keydown', ( e ) => {
   if ( e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' ) keys.left = true;
   if ( e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' ) keys.right = true;
-  if ( state.screen === 'gameover' && ( e.key === 'Enter' || e.key === ' ' ) ) {
+  if ( ( state.screen === 'gameover' || state.screen === 'victory' ) && ( e.key === 'Enter' || e.key === ' ' ) ) {
     resetGame();
   }
 } );
@@ -154,6 +154,9 @@ function checkBlockCollisions() {
     block.alive = false;
     state.score += BLOCK_SCORE;
     bounceOffBlock( b, block );
+    if ( state.blocks.every( ( bl ) => !bl.alive ) ) {
+      state.screen = 'victory';
+    }
     break;
   }
 }
@@ -172,6 +175,9 @@ function draw() {
   if ( state.screen === 'gameover' ) {
     drawGameOverScreen();
   }
+  if ( state.screen === 'victory' ) {
+    drawVictoryScreen();
+  }
 }
 
 function drawGameOverScreen() {
@@ -183,6 +189,19 @@ function drawGameOverScreen() {
   ctx.textBaseline = 'middle';
   ctx.font = '48px sans-serif';
   ctx.fillText( 'GAME OVER', canvas.width / 2, canvas.height / 2 - 30 );
+  ctx.font = '20px sans-serif';
+  ctx.fillText( 'Presiona Enter o Espacio para reiniciar', canvas.width / 2, canvas.height / 2 + 20 );
+}
+
+function drawVictoryScreen() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect( 0, 0, canvas.width, canvas.height );
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '48px sans-serif';
+  ctx.fillText( '¡VICTORIA!', canvas.width / 2, canvas.height / 2 - 30 );
   ctx.font = '20px sans-serif';
   ctx.fillText( 'Presiona Enter o Espacio para reiniciar', canvas.width / 2, canvas.height / 2 + 20 );
 }
