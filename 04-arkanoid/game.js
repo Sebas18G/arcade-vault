@@ -209,6 +209,15 @@ function updateExplosions() {
   }
 }
 
+function drawExplosions() {
+  for ( const ex of state.explosions ) {
+    const elapsed = performance.now() - ex.startTime;
+    const frameIndex = Math.min( 3, Math.floor( elapsed / ( EXPLOSION_DURATION / 4 ) ) );
+    const frame = EXPLOSION_FRAMES[ ex.color ][ frameIndex ];
+    drawFrame( ctx, frame, ex.x, ex.y, ex.w, ex.h );
+  }
+}
+
 function draw() {
   ctx.fillStyle = BG_PATTERN;
   ctx.fillRect( 0, 0, canvas.width, canvas.height );
@@ -219,6 +228,7 @@ function draw() {
     if ( !block.alive ) continue;
     drawSprite( ctx, `block_${ block.color }`, block.x, block.y, block.w, block.h );
   }
+  drawExplosions();
   drawHUD();
 
   if ( state.screen === 'gameover' ) {
