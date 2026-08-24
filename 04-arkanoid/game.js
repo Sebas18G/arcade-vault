@@ -6,14 +6,22 @@ const GRID_COLS = 10;
 const GRID_ROWS = 6;
 const BLOCK_SCORE = 10;
 
+const INITIAL_PADDLE = { x: 350, y: 570, w: 100, h: 16 };
+const INITIAL_BALL = { x: 400, y: 300, vx: 4, vy: -4, r: 8 };
+
 const state = {
   screen: 'playing', // 'playing' | 'gameover' | 'victory'
   lives: 3,
   score: 0,
-  paddle: { x: 350, y: 570, w: 100, h: 16 },
-  ball: { x: 400, y: 300, vx: 4, vy: -4, r: 8 },
+  paddle: { ...INITIAL_PADDLE },
+  ball: { ...INITIAL_BALL },
   blocks: [], // { row, col, x, y, w, h, color, alive: true }
 };
+
+function resetPositions() {
+  state.paddle = { ...INITIAL_PADDLE };
+  state.ball = { ...INITIAL_BALL };
+}
 
 const PADDLE_SPEED = 7;
 const keys = { left: false, right: false };
@@ -60,6 +68,24 @@ function updateBall() {
     b.y = b.r;
     b.vy *= -1;
   }
+
+  if ( b.vy > 0 && collidesWithPaddle( b, state.paddle ) ) {
+    b.y = state.paddle.y - b.r;
+    b.vy *= -1;
+  }
+
+  if ( b.y - b.r > canvas.height ) {
+    state.lives -= 1;
+    resetPositions();
+  }
+}
+
+function collidesWithPaddle( b, p ) {
+  const closestX = Math.max( p.x, Math.min( b.x, p.x + p.w ) );
+  const closestY = Math.max( p.y, Math.min( b.y, p.y + p.h ) );
+  const dx = b.x - closestX;
+  const dy = b.y - closestY;
+  return ( dx * dx + dy * dy ) <= b.r * b.r;
 }
 
 function draw() {
