@@ -18,6 +18,7 @@
 - Pantalla de Game Over al llegar a 0 vidas, con opción de reiniciar la partida completa (vidas, puntaje y bloques).
 - Pantalla de Victoria al romper los 60 bloques, con opción de reiniciar la partida completa.
 - Copiar `assets/assets/spritesheet-breakout.png` y `assets/assets/spritesheet.js` a una carpeta `assets/` nueva junto al `index.html` del juego, sin modificar `spritesheet.js`.
+- Estilo visual arcade clásico (agregado tras el MVP inicial, referencia: captura de pantalla `Captura de pantalla 2026-08-23 211623.png` provista por el usuario): marco/bezel oscuro alrededor del área de juego, fondo azul texturizado (patrón diagonal tipo "quilted") dentro del canvas, y HUD de puntaje/vidas con tipografía monoespaciada en mayúsculas al estilo arcade. No incluye `HIGH SCORE` ni persistencia de puntaje más alto (sigue fuera de alcance, ver sección de fuera de alcance).
 
 **Out of scope (for future specs):**
 
@@ -67,6 +68,7 @@ Convenciones:
 8. Implementar el HUD de puntaje y vidas restantes, visible en todo momento sobre el canvas. Prueba manual: el HUD se actualiza en tiempo real al perder vidas o romper bloques.
 9. Implementar la pantalla de Game Over al llegar a 0 vidas, con opción de reiniciar la partida completa. Prueba manual: perder las 3 vidas y confirmar que la pantalla aparece y el botón/tecla de reinicio regenera el estado completo.
 10. Implementar la pantalla de Victoria al romper los 60 bloques, con opción de reiniciar la partida completa. Prueba manual: romper todos los bloques y confirmar que la pantalla aparece y el reinicio funciona.
+11. Agregar el estilo visual arcade: marco/bezel oscuro alrededor del canvas (CSS), fondo azul texturizado dentro del área de juego (dibujado en `game.js`) y tipografía monoespaciada en mayúsculas para el HUD de puntaje/vidas. Prueba manual: el canvas se ve enmarcado, con fondo azul texturizado detrás de bloques/paddle/pelota, y el HUD con el nuevo estilo.
 
 ## Acceptance criteria
 
@@ -81,6 +83,7 @@ Convenciones:
 - [ ] Al llegar a 0 vidas se muestra la pantalla de Game Over con una opción que reinicia la partida completa (vidas, puntaje y bloques).
 - [ ] Al romper los 60 bloques se muestra la pantalla de Victoria con una opción que reinicia la partida completa.
 - [ ] El juego no reproduce ningún sonido ni muestra pantalla de inicio o de pausa.
+- [ ] El canvas tiene un marco/bezel oscuro visible y un fondo azul texturizado dentro del área de juego; el HUD de puntaje/vidas usa tipografía monoespaciada en mayúsculas, sin mostrar `HIGH SCORE` ni persistir puntaje.
 
 ## Decisions
 
@@ -92,6 +95,8 @@ Convenciones:
 - **No:** animación de explosión con `EXPLOSION_FRAMES`. Razón: decisión explícita de simplicidad; el bloque desaparece directo al ser golpeado.
 - **No:** persistencia de high score. Razón: decisión explícita de mostrar el puntaje solo en pantalla, sin localStorage.
 - **Yes:** conservar el progreso de bloques rotos al perder una vida (solo se reinician pelota y paddle). Razón: decisión explícita para no frustrar al jugador reiniciando el nivel completo en cada vida perdida.
+- **Yes:** agregar estilo visual arcade (marco, fondo azul texturizado, HUD monoespaciado) como parte de este MVP, agregado a mitad de implementación a pedido explícito del usuario con referencia visual. Razón: pedido explícito del usuario sobre la implementación ya en curso en la rama `spec-01-mvp-jugable`.
+- **No:** replicar el `HIGH SCORE` de la imagen de referencia ni su persistencia. Razón: sigue fuera de alcance según decisión previa de este MVP; solo se imita el estilo tipográfico/visual del HUD existente (puntaje y vidas).
 
 ## What is **not** in this spec
 
