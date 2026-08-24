@@ -43,13 +43,35 @@ function updatePaddle() {
   if ( keys.right ) state.paddle.x = clampPaddleX( state.paddle.x + PADDLE_SPEED );
 }
 
+function updateBall() {
+  const b = state.ball;
+  b.x += b.vx;
+  b.y += b.vy;
+
+  if ( b.x - b.r <= 0 ) {
+    b.x = b.r;
+    b.vx *= -1;
+  } else if ( b.x + b.r >= canvas.width ) {
+    b.x = canvas.width - b.r;
+    b.vx *= -1;
+  }
+
+  if ( b.y - b.r <= 0 ) {
+    b.y = b.r;
+    b.vy *= -1;
+  }
+}
+
 function draw() {
   ctx.clearRect( 0, 0, canvas.width, canvas.height );
   drawSprite( ctx, 'paddle', state.paddle.x, state.paddle.y, state.paddle.w, state.paddle.h );
+  const b = state.ball;
+  drawSprite( ctx, 'ball', b.x - b.r, b.y - b.r, b.r * 2, b.r * 2 );
 }
 
 function loop() {
   updatePaddle();
+  updateBall();
   draw();
   requestAnimationFrame( loop );
 }
