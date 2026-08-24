@@ -13,7 +13,7 @@ function playSound( name ) {
   audio.play().catch( () => {} );
 }
 
-const BLOCK_COLORS = [ 'gray', 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
+const BLOCK_COLORS = [ 'red', 'yellow', 'cyan', 'magenta', 'hotpink', 'green' ];
 const GRID_COLS = 10;
 const GRID_ROWS = 6;
 const BLOCK_SCORE = 10;
