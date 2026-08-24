@@ -6,6 +6,12 @@ const GRID_COLS = 10;
 const GRID_ROWS = 6;
 const BLOCK_SCORE = 10;
 
+const BLOCK_W = 76;
+const BLOCK_H = 24;
+const BLOCK_GAP = 4;
+const BLOCK_MARGIN_X = 2;
+const BLOCK_MARGIN_TOP = 60;
+
 const INITIAL_PADDLE = { x: 350, y: 570, w: 100, h: 16 };
 const INITIAL_BALL = { x: 400, y: 300, vx: 4, vy: -4, r: 8 };
 
@@ -22,6 +28,27 @@ function resetPositions() {
   state.paddle = { ...INITIAL_PADDLE };
   state.ball = { ...INITIAL_BALL };
 }
+
+function generateBlocks() {
+  const blocks = [];
+  for ( let row = 0; row < GRID_ROWS; row++ ) {
+    for ( let col = 0; col < GRID_COLS; col++ ) {
+      blocks.push( {
+        row,
+        col,
+        x: BLOCK_MARGIN_X + col * ( BLOCK_W + BLOCK_GAP ),
+        y: BLOCK_MARGIN_TOP + row * ( BLOCK_H + BLOCK_GAP ),
+        w: BLOCK_W,
+        h: BLOCK_H,
+        color: BLOCK_COLORS[ Math.floor( Math.random() * BLOCK_COLORS.length ) ],
+        alive: true,
+      } );
+    }
+  }
+  return blocks;
+}
+
+state.blocks = generateBlocks();
 
 const PADDLE_SPEED = 7;
 const keys = { left: false, right: false };
@@ -93,6 +120,10 @@ function draw() {
   drawSprite( ctx, 'paddle', state.paddle.x, state.paddle.y, state.paddle.w, state.paddle.h );
   const b = state.ball;
   drawSprite( ctx, 'ball', b.x - b.r, b.y - b.r, b.r * 2, b.r * 2 );
+  for ( const block of state.blocks ) {
+    if ( !block.alive ) continue;
+    drawSprite( ctx, `block_${ block.color }`, block.x, block.y, block.w, block.h );
+  }
 }
 
 function loop() {
