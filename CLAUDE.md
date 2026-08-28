@@ -25,6 +25,8 @@ El proyecto se desarrolla con **Spec Driven Design**, usando los comandos `/spec
 
 Al implementar features en `app/` (Next.js real), usar `resources/templates/` como fuente de verdad para diseño visual, copy en Español, nombres de pantallas/rutas y forma de los datos — pero traduciendo la arquitectura a componentes de Next.js/React 19 idiomáticos (no copiar el enrutamiento por hash ni los scripts Babel-en-navegador tal cual).
 
+## Skills Usa /frontend-design para diseñar interfaces de usuario.
+
 ## Comandos
 
 ```bash

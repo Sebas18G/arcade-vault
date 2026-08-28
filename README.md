@@ -13,4 +13,6 @@ https://github.com/Klerith/fernando-skills
 
 ```bash
 npx skills@latest add Klerith/fernando-skills
+
+npx skills add https://github.com/anthropics/skills --skill frontend-design
 ```
