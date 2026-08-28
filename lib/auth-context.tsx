@@ -1,6 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { getUser, setUser as persistUser, type UserSession } from "@/lib/storage";
 
 type AuthContextValue = {
@@ -11,22 +18,48 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+let cachedUser: UserSession = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((listener) => listener());
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot(): UserSession {
+  return cachedUser;
+}
+
+function getServerSnapshot(): UserSession {
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserSession>(null);
+  const user = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
-    setUser(getUser());
+    const stored = getUser();
+    if (stored?.name !== cachedUser?.name) {
+      cachedUser = stored;
+      notify();
+    }
   }, []);
 
-  const login = (nextUser: UserSession) => {
-    setUser(nextUser);
+  const login = useCallback((nextUser: UserSession) => {
     persistUser(nextUser);
-  };
+    cachedUser = nextUser;
+    notify();
+  }, []);
 
-  const logout = () => {
-    setUser(null);
+  const logout = useCallback(() => {
     persistUser(null);
-  };
+    cachedUser = null;
+    notify();
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, login, logout }}>
