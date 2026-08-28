@@ -31,7 +31,7 @@ Implementación del clásico **Tetris** en JavaScript vanilla, usando HTML5 Canv
 
 ## Qué hace el proyecto
 
-Es una versión jugable del Tetris clásico con todas las mecánicas que esperarías:
+Es una versión jugable del Tetris clásico con todas las mecánicas que esperarías, más power-ups y un sistema de combos:
 
 - Tablero de **10 × 20** celdas.
 - Las **7 piezas estándar** (I, O, T, S, Z, J, L) con colores diferenciados.
@@ -39,9 +39,17 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - **Soft drop** (bajada acelerada) y **hard drop** (caída instantánea).
 - **Pieza fantasma** (_ghost piece_): muestra dónde aterrizará la pieza actual.
 - **Vista previa** de la siguiente pieza.
+- **Power-ups** de una sola celda, que aparecen tras cierto número de líneas eliminadas:
+  - 💣 **Bomba** — destruye el área 3×3 a su alrededor.
+  - ⚡ **Rayo** — limpia toda la fila y la columna donde cae.
+  - 🎨 **Tinte** — elimina todos los bloques de un color elegido al azar.
+  - ⬇️ **Gravedad** — compacta los huecos de cada columna hacia abajo.
+  - ❄️ **Congelar** — detiene la caída automática unos segundos (el jugador conserva el control).
+- **Combos y bonificaciones**: rachas de líneas consecutivas multiplican el puntaje, con detección de **T-spin**, **back-to-back** y **Perfect Clear** (tablero vacío), acompañadas de un toast, un destello en el tablero y sonido sintetizado con Web Audio API.
 - **Sistema de puntuación** clásico de Tetris (100 / 300 / 500 / 800 multiplicado por nivel).
 - **Niveles** que aumentan cada 10 líneas y aceleran la caída.
 - **Pausa** y **Game Over** con opción de reinicio.
+- Interruptor entre tema oscuro y claro.
 
 ---
 
@@ -117,6 +125,8 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
 - **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
+- **Power-ups** (`applyPowerUpEffect`): piezas especiales de 1 bloque (bomba, rayo, tinte, gravedad, congelar) que aparecen tras cierto número de líneas eliminadas y disparan un efecto sobre el tablero al fijarse.
+- **Combos** (`clearLines`): rachas de líneas consecutivas multiplican el puntaje, con detección de T-spin (`detectTSpin`), back-to-back y Perfect Clear, más un pequeño sintetizador de sonido con Web Audio API (`playClearSound`).
 
 ### Flujo del juego
 
@@ -155,11 +165,12 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 ## Estructura del proyecto
 
 ```
-03-tetris/
+03-tetris/claude-tetris/
 ├── index.html      # Estructura del DOM y canvas
 ├── style.css       # Estilos del juego (dark theme)
-├── game.js         # Toda la lógica del Tetris (~300 líneas)
-└── README.md
+├── game.js         # Toda la lógica del Tetris, incluyendo power-ups y combos
+├── README.md
+└── CLAUDE.md       # Notas de arquitectura para agentes de desarrollo
 ```
 
 ---
