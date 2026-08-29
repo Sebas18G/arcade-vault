@@ -52,7 +52,7 @@ function GameOverModal({
           <button className="btn" onClick={onRestart}>
             JUGAR DE NUEVO
           </button>
-          <Link href="/" className="btn magenta">
+          <Link href="/games" className="btn magenta">
             VOLVER AL VAULT
           </Link>
         </div>
