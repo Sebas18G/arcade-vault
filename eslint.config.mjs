@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Mockup de referencia standalone (Babel-en-navegador, sin build step): no es código del proyecto.
+    "references/**",
   ]),
 ]);
 
