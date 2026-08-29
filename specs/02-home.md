@@ -1,6 +1,6 @@
 # SPEC 02 — Home (landing)
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 01
 > **Date:** 2026-08-28
 > **Objective:** Implementar en Next.js la pantalla Home (landing) del mockup de referencia (`references/home-about/home.jsx`), moviendo la Biblioteca de `/` a `/games` y actualizando la navegación y los enlaces cruzados para reflejar ese nuevo ruteo.
