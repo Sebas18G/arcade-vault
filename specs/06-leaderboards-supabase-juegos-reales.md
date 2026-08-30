@@ -1,6 +1,6 @@
 # SPEC 06 — Leaderboards reales en Supabase (Asteroids, Tetris, Arkanoid)
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 04, SPEC 05
 > **Date:** 2026-08-30
 > **Objective:** Mover el leaderboard de Asteroids/Tetris/Arkanoid de `localStorage` a tablas propias en Supabase (una por juego + una global), y hacer que el Salón de la Fama y la ficha de cada juego lean esos datos reales en vivo en vez de `seededScores`.
