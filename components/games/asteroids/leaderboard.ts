@@ -1,44 +1,41 @@
+import { createClient } from "@/lib/supabase/client";
 import type {
   AsteroidsGameOverResult,
   LeaderboardEntry,
 } from "@/components/games/shared/types";
-const LEADERBOARD_KEY = "asteroids_leaderboard_v1";
 const PLAYER_NAME_KEY = "asteroids_player_name";
 const MAX_ENTRIES = 5;
-export function getAsteroidsLeaderboard(): LeaderboardEntry[] {
-  try {
-    const raw = localStorage.getItem(LEADERBOARD_KEY);
-    const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
+export async function getAsteroidsLeaderboard(): Promise<LeaderboardEntry[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("asteroids_scores")
+    .select("id, player_name, score, level, asteroids_destroyed, best_combo")
+    .order("score", { ascending: false })
+    .limit(MAX_ENTRIES);
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    name: row.player_name,
+    score: row.score,
+    level: row.level,
+    destroyed: row.asteroids_destroyed,
+    combo: row.best_combo,
+  }));
 }
-function saveLeaderboardList(list: LeaderboardEntry[]) {
-  try {
-    localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(list));
-  } catch {
-    // localStorage no disponible
-  }
-}
-export function addAsteroidsScore(
+export async function addAsteroidsScore(
   name: string,
   result: AsteroidsGameOverResult,
-): LeaderboardEntry[] {
-  const entry: LeaderboardEntry = {
-    id: `${Date.now()}-${Math.random()}`,
-    name,
+): Promise<LeaderboardEntry[]> {
+  const supabase = createClient();
+  const { error } = await supabase.from("asteroids_scores").insert({
+    player_name: name,
     score: result.score,
     level: result.level,
-    destroyed: result.asteroidsDestroyed,
-    combo: result.bestCombo,
-  };
-  const list = getAsteroidsLeaderboard();
-  list.push(entry);
-  list.sort((a, b) => b.score - a.score);
-  list.length = Math.min(list.length, MAX_ENTRIES);
-  saveLeaderboardList(list);
-  return list;
+    asteroids_destroyed: result.asteroidsDestroyed,
+    best_combo: result.bestCombo,
+  });
+  if (error) throw error;
+  return getAsteroidsLeaderboard();
 }
 export function getSavedPlayerName(): string {
   try {
