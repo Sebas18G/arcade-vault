@@ -43,7 +43,9 @@ function GameOverModal({
   user: UserSession;
   leaderboard?: {
     entries: LeaderboardEntry[];
-    onSaveName: (name: string) => void;
+    loading?: boolean;
+    fetchError?: string | null;
+    onSaveName: (name: string) => void | Promise<void>;
   };
   scoreOnly?: boolean;
   defaultName?: string;
@@ -53,13 +55,24 @@ function GameOverModal({
     () => defaultName ?? user?.name ?? "INVITADO",
   );
   const [saved, setSaved] = useState(false);
-  const saveScore = () => {
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveScore = async () => {
     if (leaderboard) {
-      leaderboard.onSaveName(name);
+      setSaving(true);
+      setSaveError(null);
+      try {
+        await leaderboard.onSaveName(name);
+        setSaved(true);
+      } catch {
+        setSaveError("No se pudo guardar la puntuación. Intenta de nuevo.");
+      } finally {
+        setSaving(false);
+      }
     } else {
       addScore({ game: game.id, score, name });
+      setSaved(true);
     }
-    setSaved(true);
   };
   return (
     <div className="modal-bd">
@@ -72,33 +85,53 @@ function GameOverModal({
             NIVEL {String(level).padStart(2, "0")}
           </div>
         )}
-        {leaderboard && leaderboard.entries.length > 0 && (
+        {leaderboard && leaderboard.loading && (
           <div
-            className="leaderboard"
-            style={{ marginTop: 20, textAlign: "left" }}
+            className="mono"
+            style={{ marginTop: 20, fontSize: 11, color: "var(--ink-dim)" }}
           >
-            <h3>MEJORES PUNTUACIONES</h3>
-            {leaderboard.entries.map((entry, i) => (
-              <div
-                key={entry.id}
-                className={
-                  "lb-row" +
-                  (i === 0
-                    ? " top1"
-                    : i === 1
-                      ? " top2"
-                      : i === 2
-                        ? " top3"
-                        : "")
-                }
-              >
-                <div className="rk">#{String(i + 1).padStart(2, "0")}</div>
-                <div className="pl">{entry.name}</div>
-                <div className="sc">{entry.score.toLocaleString("es-ES")}</div>
-              </div>
-            ))}
+            CARGANDO PUNTUACIONES...
           </div>
         )}
+        {leaderboard && leaderboard.fetchError && (
+          <div
+            className="mono"
+            style={{ marginTop: 20, fontSize: 11, color: "var(--magenta)" }}
+          >
+            {leaderboard.fetchError}
+          </div>
+        )}
+        {leaderboard &&
+          !leaderboard.loading &&
+          leaderboard.entries.length > 0 && (
+            <div
+              className="leaderboard"
+              style={{ marginTop: 20, textAlign: "left" }}
+            >
+              <h3>MEJORES PUNTUACIONES</h3>
+              {leaderboard.entries.map((entry, i) => (
+                <div
+                  key={entry.id}
+                  className={
+                    "lb-row" +
+                    (i === 0
+                      ? " top1"
+                      : i === 1
+                        ? " top2"
+                        : i === 2
+                          ? " top3"
+                          : "")
+                  }
+                >
+                  <div className="rk">#{String(i + 1).padStart(2, "0")}</div>
+                  <div className="pl">{entry.name}</div>
+                  <div className="sc">
+                    {entry.score.toLocaleString("es-ES")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         {!scoreOnly &&
           (!saved ? (
             <div className="input-row">
@@ -108,14 +141,27 @@ function GameOverModal({
                   setName(e.target.value.toUpperCase().slice(0, 10))
                 }
                 placeholder="TUS INICIALES"
+                disabled={saving}
               />
-              <button className="btn yellow" onClick={saveScore}>
-                GUARDAR PUNTUACIÓN
+              <button
+                className="btn yellow"
+                onClick={saveScore}
+                disabled={saving}
+              >
+                {saving ? "GUARDANDO..." : "GUARDAR PUNTUACIÓN"}
               </button>
             </div>
           ) : (
             <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
           ))}
+        {saveError && (
+          <div
+            className="mono"
+            style={{ marginTop: 8, fontSize: 11, color: "var(--magenta)" }}
+          >
+            {saveError}
+          </div>
+        )}
         <div className="actions">
           <button className="btn" onClick={onRestart}>
             JUGAR DE NUEVO
@@ -150,6 +196,10 @@ export function GamePlayer({ game }: { game: Game }) {
   const [leaderboardEntries, setLeaderboardEntries] = useState<
     LeaderboardEntry[]
   >([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardFetchError, setLeaderboardFetchError] = useState<
+    string | null
+  >(null);
   const canvasRef = useRef<GameCanvasHandle>(null);
   const level = isPortedGame ? engineLevel : Math.floor(score / 2500) + 1;
   useEffect(() => {
@@ -169,12 +219,25 @@ export function GamePlayer({ game }: { game: Game }) {
     setAsteroidsResult(null);
     setTetrisResult(null);
     setArkanoidResult(null);
+    setLeaderboardEntries([]);
+    setLeaderboardLoading(false);
+    setLeaderboardFetchError(null);
     canvasRef.current?.restart();
+  };
+  const loadAsteroidsLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardFetchError(null);
+    getAsteroidsLeaderboard()
+      .then(setLeaderboardEntries)
+      .catch(() =>
+        setLeaderboardFetchError("No se pudieron cargar las puntuaciones."),
+      )
+      .finally(() => setLeaderboardLoading(false));
   };
   const handleAsteroidsGameOver = (result: AsteroidsGameOverResult) => {
     setAsteroidsResult(result);
-    setLeaderboardEntries(getAsteroidsLeaderboard());
     setOver(true);
+    loadAsteroidsLeaderboard();
   };
   const handleTetrisGameOver = (result: TetrisGameOverResult) => {
     setTetrisResult(result);
@@ -194,7 +257,7 @@ export function GamePlayer({ game }: { game: Game }) {
         asteroidsDestroyed: 0,
         bestCombo: 0,
       });
-      setLeaderboardEntries(getAsteroidsLeaderboard());
+      loadAsteroidsLeaderboard();
     }
     if (isTetris) {
       setTetrisResult({ score, level: engineLevel, lines: 0, bestCombo: 0 });
@@ -340,7 +403,9 @@ export function GamePlayer({ game }: { game: Game }) {
             isAsteroids
               ? {
                   entries: leaderboardEntries,
-                  onSaveName: (name) => {
+                  loading: leaderboardLoading,
+                  fetchError: leaderboardFetchError,
+                  onSaveName: async (name) => {
                     const result = asteroidsResult ?? {
                       score,
                       level: engineLevel,
@@ -348,7 +413,8 @@ export function GamePlayer({ game }: { game: Game }) {
                       bestCombo: 0,
                     };
                     setSavedPlayerName(name);
-                    setLeaderboardEntries(addAsteroidsScore(name, result));
+                    const entries = await addAsteroidsScore(name, result);
+                    setLeaderboardEntries(entries);
                   },
                 }
               : isTetris
