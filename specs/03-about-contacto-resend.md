@@ -1,6 +1,6 @@
 # SPEC 03 — Acerca de + contacto con Resend
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 01, SPEC 02
 > **Date:** 2026-08-28
 > **Objective:** Implementar la pantalla Acerca de (`/about`) traducida fielmente desde `references/home-about/about.jsx`, con un formulario de contacto que envía correos reales mediante la API de Resend a través de una nueva ruta de servidor.
