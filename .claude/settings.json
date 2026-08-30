@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/format-and-lint.sh",
+            "shell": "bash",
+            "timeout": 30,
+            "statusMessage": "Formateando y verificando lint..."
+          }
+        ]
+      }
+    ]
+  }
+}
