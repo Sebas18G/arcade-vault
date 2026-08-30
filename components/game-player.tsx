@@ -26,6 +26,10 @@ import {
   updateTetrisBestStats,
 } from "@/components/games/tetris/leaderboard";
 import { ArkanoidCanvas } from "@/components/games/arkanoid/arkanoid-canvas";
+import {
+  addArkanoidScore,
+  getArkanoidLeaderboard,
+} from "@/components/games/arkanoid/leaderboard";
 const LIVES = 3;
 function GameOverModal({
   game,
@@ -33,7 +37,6 @@ function GameOverModal({
   level,
   user,
   leaderboard,
-  scoreOnly,
   defaultName,
   onRestart,
 }: {
@@ -47,7 +50,6 @@ function GameOverModal({
     fetchError?: string | null;
     onSaveName: (name: string) => void | Promise<void>;
   };
-  scoreOnly?: boolean;
   defaultName?: string;
   onRestart: () => void;
 }) {
@@ -132,28 +134,27 @@ function GameOverModal({
               ))}
             </div>
           )}
-        {!scoreOnly &&
-          (!saved ? (
-            <div className="input-row">
-              <input
-                value={name}
-                onChange={(e) =>
-                  setName(e.target.value.toUpperCase().slice(0, 10))
-                }
-                placeholder="TUS INICIALES"
-                disabled={saving}
-              />
-              <button
-                className="btn yellow"
-                onClick={saveScore}
-                disabled={saving}
-              >
-                {saving ? "GUARDANDO..." : "GUARDAR PUNTUACIÓN"}
-              </button>
-            </div>
-          ) : (
-            <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
-          ))}
+        {!saved ? (
+          <div className="input-row">
+            <input
+              value={name}
+              onChange={(e) =>
+                setName(e.target.value.toUpperCase().slice(0, 10))
+              }
+              placeholder="TUS INICIALES"
+              disabled={saving}
+            />
+            <button
+              className="btn yellow"
+              onClick={saveScore}
+              disabled={saving}
+            >
+              {saving ? "GUARDANDO..." : "GUARDAR PUNTUACIÓN"}
+            </button>
+          </div>
+        ) : (
+          <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
+        )}
         {saveError && (
           <div
             className="mono"
@@ -255,9 +256,20 @@ export function GamePlayer({ game }: { game: Game }) {
     setOver(true);
     loadTetrisLeaderboard();
   };
+  const loadArkanoidLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardFetchError(null);
+    getArkanoidLeaderboard()
+      .then(setLeaderboardEntries)
+      .catch(() =>
+        setLeaderboardFetchError("No se pudieron cargar las puntuaciones."),
+      )
+      .finally(() => setLeaderboardLoading(false));
+  };
   const handleArkanoidGameOver = (result: GameOverResult) => {
     setArkanoidResult(result);
     setOver(true);
+    loadArkanoidLeaderboard();
   };
   const handleForceEnd = () => {
     if (isAsteroids) {
@@ -275,6 +287,7 @@ export function GamePlayer({ game }: { game: Game }) {
     }
     if (isArkanoid) {
       setArkanoidResult({ score, level: engineLevel });
+      loadArkanoidLeaderboard();
     }
     setOver(true);
   };
@@ -402,7 +415,6 @@ export function GamePlayer({ game }: { game: Game }) {
                   ? (arkanoidResult?.level ?? engineLevel)
                   : undefined
           }
-          scoreOnly={isArkanoid}
           user={user}
           defaultName={
             isAsteroids
@@ -443,7 +455,21 @@ export function GamePlayer({ game }: { game: Game }) {
                       setLeaderboardEntries(entries);
                     },
                   }
-                : undefined
+                : isArkanoid
+                  ? {
+                      entries: leaderboardEntries,
+                      loading: leaderboardLoading,
+                      fetchError: leaderboardFetchError,
+                      onSaveName: async (name) => {
+                        const result = arkanoidResult ?? {
+                          score,
+                          level: engineLevel,
+                        };
+                        const entries = await addArkanoidScore(name, result);
+                        setLeaderboardEntries(entries);
+                      },
+                    }
+                  : undefined
           }
           onRestart={restart}
         />
