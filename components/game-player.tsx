@@ -20,9 +20,14 @@ import {
   setSavedPlayerName,
 } from "@/components/games/asteroids/leaderboard";
 import { TetrisCanvas } from "@/components/games/tetris/tetris-canvas";
+import type { TetrisSkin } from "@/components/games/tetris/engine";
 import {
   addTetrisScore,
   getTetrisLeaderboard,
+  getTetrisSkin,
+  getTetrisTheme,
+  setTetrisSkin,
+  setTetrisTheme,
   updateTetrisBestStats,
 } from "@/components/games/tetris/leaderboard";
 import { ArkanoidCanvas } from "@/components/games/arkanoid/arkanoid-canvas";
@@ -31,6 +36,12 @@ import {
   getArkanoidLeaderboard,
 } from "@/components/games/arkanoid/leaderboard";
 const LIVES = 3;
+const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
+  { value: "retro", label: "Retro" },
+  { value: "neon", label: "Neon" },
+  { value: "pastel", label: "Pastel" },
+  { value: "pixel", label: "Pixel Art" },
+];
 function GameOverModal({
   game,
   score,
@@ -201,8 +212,35 @@ export function GamePlayer({ game }: { game: Game }) {
   const [leaderboardFetchError, setLeaderboardFetchError] = useState<
     string | null
   >(null);
+  // Arrancan en el default "seguro para SSR" (el servidor no tiene localStorage)
+  // y se corrigen en un useEffect post-hidratación para no producir un
+  // hydration mismatch cuando el usuario ya tenía guardada otra preferencia.
+  const [tetrisSkin, setTetrisSkinState] = useState<TetrisSkin>("retro");
+  const [tetrisTheme, setTetrisThemeState] = useState<"dark" | "light">("dark");
   const canvasRef = useRef<GameCanvasHandle>(null);
   const level = isPortedGame ? engineLevel : Math.floor(score / 2500) + 1;
+  useEffect(() => {
+    if (!isTetris) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTetrisSkinState(getTetrisSkin());
+    setTetrisThemeState(getTetrisTheme());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const cycleTetrisSkin = () => {
+    setTetrisSkinState((prev) => {
+      const idx = TETRIS_SKINS.findIndex((s) => s.value === prev);
+      const next = TETRIS_SKINS[(idx + 1) % TETRIS_SKINS.length].value;
+      setTetrisSkin(next);
+      return next;
+    });
+  };
+  const toggleTetrisTheme = () => {
+    setTetrisThemeState((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      setTetrisTheme(next);
+      return next;
+    });
+  };
   useEffect(() => {
     if (isPortedGame) return;
     if (over || paused) return;
@@ -313,6 +351,23 @@ export function GamePlayer({ game }: { game: Game }) {
             <div className="l">Nivel</div>
             <div className="v">{String(level).padStart(2, "0")}</div>
           </div>
+          {isTetris && (
+            <>
+              <div className="hud-stat">
+                <div className="l">Skin</div>
+                <button type="button" className="v" onClick={cycleTetrisSkin}>
+                  {TETRIS_SKINS.find((s) => s.value === tetrisSkin)?.label ??
+                    "Retro"}
+                </button>
+              </div>
+              <div className="hud-stat">
+                <div className="l">Tema</div>
+                <button type="button" className="v" onClick={toggleTetrisTheme}>
+                  {tetrisTheme === "dark" ? "OSCURO" : "CLARO"}
+                </button>
+              </div>
+            </>
+          )}
         </div>
         <div className="hud-actions">
           <button className="btn yellow" onClick={() => setPaused((p) => !p)}>
@@ -341,6 +396,8 @@ export function GamePlayer({ game }: { game: Game }) {
             <TetrisCanvas
               ref={canvasRef}
               paused={paused || over}
+              skin={tetrisSkin}
+              theme={tetrisTheme}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
