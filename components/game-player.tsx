@@ -1,53 +1,97 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Game } from "@/app/data/games";
 import { useAuth } from "@/lib/auth-context";
 import { addScore } from "@/lib/storage";
 import type { UserSession } from "@/lib/storage";
-
+import type { LeaderboardEntry } from "@/components/games/shared/types";
 const LIVES = 3;
-
 function GameOverModal({
   game,
   score,
+  level,
   user,
+  leaderboard,
+  scoreOnly,
   onRestart,
 }: {
   game: Game;
   score: number;
+  level?: number;
   user: UserSession;
+  leaderboard?: {
+    entries: LeaderboardEntry[];
+    onSaveName: (name: string) => void;
+  };
+  scoreOnly?: boolean;
   onRestart: () => void;
 }) {
   const [name, setName] = useState(() => user?.name ?? "INVITADO");
   const [saved, setSaved] = useState(false);
-
   const saveScore = () => {
-    addScore({ game: game.id, score, name });
+    if (leaderboard) {
+      leaderboard.onSaveName(name);
+    } else {
+      addScore({ game: game.id, score, name });
+    }
     setSaved(true);
   };
-
   return (
     <div className="modal-bd">
       <div className="modal">
         <h2>FIN DEL JUEGO</h2>
         <div className="final-label">PUNTUACIÓN FINAL</div>
         <div className="final">{score.toLocaleString("es-ES")}</div>
-        {!saved ? (
-          <div className="input-row">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value.toUpperCase().slice(0, 10))}
-              placeholder="TUS INICIALES"
-            />
-            <button className="btn yellow" onClick={saveScore}>
-              GUARDAR PUNTUACIÓN
-            </button>
+        {level !== undefined && (
+          <div className="final-label" style={{ marginTop: 4 }}>
+            NIVEL {String(level).padStart(2, "0")}
           </div>
-        ) : (
-          <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
         )}
+        {leaderboard && leaderboard.entries.length > 0 && (
+          <div
+            className="leaderboard"
+            style={{ marginTop: 20, textAlign: "left" }}
+          >
+            <h3>MEJORES PUNTUACIONES</h3>
+            {leaderboard.entries.map((entry, i) => (
+              <div
+                key={entry.id}
+                className={
+                  "lb-row" +
+                  (i === 0
+                    ? " top1"
+                    : i === 1
+                      ? " top2"
+                      : i === 2
+                        ? " top3"
+                        : "")
+                }
+              >
+                <div className="rk">#{String(i + 1).padStart(2, "0")}</div>
+                <div className="pl">{entry.name}</div>
+                <div className="sc">{entry.score.toLocaleString("es-ES")}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {!scoreOnly &&
+          (!saved ? (
+            <div className="input-row">
+              <input
+                value={name}
+                onChange={(e) =>
+                  setName(e.target.value.toUpperCase().slice(0, 10))
+                }
+                placeholder="TUS INICIALES"
+              />
+              <button className="btn yellow" onClick={saveScore}>
+                GUARDAR PUNTUACIÓN
+              </button>
+            </div>
+          ) : (
+            <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>
+          ))}
         <div className="actions">
           <button className="btn" onClick={onRestart}>
             JUGAR DE NUEVO
@@ -60,15 +104,12 @@ function GameOverModal({
     </div>
   );
 }
-
 export function GamePlayer({ game }: { game: Game }) {
   const { user } = useAuth();
   const [score, setScore] = useState(0);
   const [paused, setPaused] = useState(false);
   const [over, setOver] = useState(false);
-
   const level = Math.floor(score / 2500) + 1;
-
   useEffect(() => {
     if (over || paused) return;
     const t = setInterval(() => {
@@ -76,13 +117,11 @@ export function GamePlayer({ game }: { game: Game }) {
     }, 220);
     return () => clearInterval(t);
   }, [over, paused]);
-
   const restart = () => {
     setScore(0);
     setPaused(false);
     setOver(false);
   };
-
   return (
     <div className="av-player fade-in">
       <div className="player-hud">
@@ -118,7 +157,6 @@ export function GamePlayer({ game }: { game: Game }) {
           </Link>
         </div>
       </div>
-
       <div className="crt">
         <div className="crt-screen">
           <div className="game-arena">
@@ -129,14 +167,22 @@ export function GamePlayer({ game }: { game: Game }) {
             <div className="player-ship"></div>
           </div>
           {paused && (
-            <div className="crt-content" style={{ background: "rgba(0,0,0,0.6)", zIndex: 5 }}>
+            <div
+              className="crt-content"
+              style={{ background: "rgba(0,0,0,0.6)", zIndex: 5 }}
+            >
               <div>
                 <div className="pixel neon-yellow" style={{ fontSize: 22 }}>
                   EN PAUSA
                 </div>
                 <div
                   className="mono"
-                  style={{ fontSize: 11, color: "var(--ink-dim)", marginTop: 10, letterSpacing: "0.16em" }}
+                  style={{
+                    fontSize: 11,
+                    color: "var(--ink-dim)",
+                    marginTop: 10,
+                    letterSpacing: "0.16em",
+                  }}
                 >
                   PULSA REANUDAR PARA CONTINUAR
                 </div>
@@ -150,8 +196,14 @@ export function GamePlayer({ game }: { game: Game }) {
           <span>CARGA · 1MB</span>
         </div>
       </div>
-
-      {over && <GameOverModal game={game} score={score} user={user} onRestart={restart} />}
+      {over && (
+        <GameOverModal
+          game={game}
+          score={score}
+          user={user}
+          onRestart={restart}
+        />
+      )}
     </div>
   );
 }
