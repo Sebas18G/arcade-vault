@@ -6,6 +6,7 @@ const SCORE_TABLE: Record<string, string> = {
   asteroids: "asteroids_scores",
   tetris: "tetris_scores",
   arkanoid: "arkanoid_scores",
+  snake: "snake_scores",
 };
 type DetailScoreRow = {
   key: string;
