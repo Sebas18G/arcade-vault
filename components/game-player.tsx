@@ -234,6 +234,16 @@ export function GamePlayer({ game }: { game: Game }) {
       )
       .finally(() => setLeaderboardLoading(false));
   };
+  const loadTetrisLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardFetchError(null);
+    getTetrisLeaderboard()
+      .then(setLeaderboardEntries)
+      .catch(() =>
+        setLeaderboardFetchError("No se pudieron cargar las puntuaciones."),
+      )
+      .finally(() => setLeaderboardLoading(false));
+  };
   const handleAsteroidsGameOver = (result: AsteroidsGameOverResult) => {
     setAsteroidsResult(result);
     setOver(true);
@@ -242,8 +252,8 @@ export function GamePlayer({ game }: { game: Game }) {
   const handleTetrisGameOver = (result: TetrisGameOverResult) => {
     setTetrisResult(result);
     updateTetrisBestStats(result);
-    setLeaderboardEntries(getTetrisLeaderboard());
     setOver(true);
+    loadTetrisLeaderboard();
   };
   const handleArkanoidGameOver = (result: GameOverResult) => {
     setArkanoidResult(result);
@@ -261,7 +271,7 @@ export function GamePlayer({ game }: { game: Game }) {
     }
     if (isTetris) {
       setTetrisResult({ score, level: engineLevel, lines: 0, bestCombo: 0 });
-      setLeaderboardEntries(getTetrisLeaderboard());
+      loadTetrisLeaderboard();
     }
     if (isArkanoid) {
       setArkanoidResult({ score, level: engineLevel });
@@ -420,14 +430,17 @@ export function GamePlayer({ game }: { game: Game }) {
               : isTetris
                 ? {
                     entries: leaderboardEntries,
-                    onSaveName: (name) => {
+                    loading: leaderboardLoading,
+                    fetchError: leaderboardFetchError,
+                    onSaveName: async (name) => {
                       const result = tetrisResult ?? {
                         score,
                         level: engineLevel,
                         lines: 0,
                         bestCombo: 0,
                       };
-                      setLeaderboardEntries(addTetrisScore(name, result));
+                      const entries = await addTetrisScore(name, result);
+                      setLeaderboardEntries(entries);
                     },
                   }
                 : undefined

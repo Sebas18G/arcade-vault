@@ -1,9 +1,9 @@
+import { createClient } from "@/lib/supabase/client";
 import type {
   LeaderboardEntry,
   TetrisGameOverResult,
 } from "@/components/games/shared/types";
 import type { TetrisSkin } from "@/components/games/tetris/engine";
-const HIGHSCORES_KEY = "tetris-highscores";
 const BEST_STATS_KEY = "tetris-best-stats";
 const THEME_KEY = "tetris-theme";
 const SKIN_KEY = "tetris-skin";
@@ -17,55 +17,36 @@ function loadJSON<T>(key: string, fallback: T): T {
     return fallback;
   }
 }
-export function getTetrisLeaderboard(): LeaderboardEntry[] {
-  const parsed = loadJSON<unknown>(HIGHSCORES_KEY, []);
-  if (!Array.isArray(parsed)) return [];
-  return parsed
-    .filter(
-      (e): e is Record<string, unknown> =>
-        !!e &&
-        typeof e === "object" &&
-        typeof (e as Record<string, unknown>).score === "number" &&
-        isFinite((e as Record<string, unknown>).score as number),
-    )
-    .map((e, i) => ({
-      id: `${i}-${e.score}`,
-      name: typeof e.name === "string" && e.name ? e.name : "AAA",
-      score: e.score as number,
-      level: 0,
-      maxCombo:
-        typeof e.maxCombo === "number" && isFinite(e.maxCombo) ? e.maxCombo : 0,
-      lines: typeof e.lines === "number" && isFinite(e.lines) ? e.lines : 0,
-    }));
+export async function getTetrisLeaderboard(): Promise<LeaderboardEntry[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("tetris_scores")
+    .select("id, player_name, score, level, lines, best_combo")
+    .order("score", { ascending: false })
+    .limit(MAX_ENTRIES);
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: row.id,
+    name: row.player_name,
+    score: row.score,
+    level: row.level,
+    lines: row.lines,
+    maxCombo: row.best_combo,
+  }));
 }
-function saveHighscores(
-  list: { name: string; score: number; maxCombo: number; lines: number }[],
-) {
-  try {
-    localStorage.setItem(HIGHSCORES_KEY, JSON.stringify(list));
-  } catch {
-    // localStorage no disponible
-  }
-}
-export function addTetrisScore(
+export async function addTetrisScore(
   name: string,
   result: TetrisGameOverResult,
-): LeaderboardEntry[] {
-  const list = getTetrisLeaderboard().map((e) => ({
-    name: e.name,
-    score: e.score,
-    maxCombo: e.maxCombo as number,
-    lines: e.lines as number,
-  }));
-  list.push({
-    name,
+): Promise<LeaderboardEntry[]> {
+  const supabase = createClient();
+  const { error } = await supabase.from("tetris_scores").insert({
+    player_name: name,
     score: result.score,
-    maxCombo: result.bestCombo,
+    level: result.level,
     lines: result.lines,
+    best_combo: result.bestCombo,
   });
-  list.sort((a, b) => b.score - a.score);
-  const top = list.slice(0, MAX_ENTRIES);
-  saveHighscores(top);
+  if (error) throw error;
   return getTetrisLeaderboard();
 }
 export function getTetrisBestStats(): { bestCombo: number; bestLines: number } {
