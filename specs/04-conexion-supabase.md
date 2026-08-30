@@ -1,6 +1,6 @@
 # SPEC 04 — Conexión a Supabase
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** —
 > **Date:** 2026-08-29
 > **Objective:** Conectar la aplicación Next.js al proyecto de Supabase ya referenciado en `.mcp.json` instalando los paquetes oficiales y creando clientes de navegador/servidor reutilizables, sin crear tablas ni implementar features (auth, tiempo real, edge functions) todavía.
@@ -62,22 +62,24 @@ Ambas variables llevan el prefijo `NEXT_PUBLIC_` porque son seguras de exponer e
 
 ## Acceptance criteria
 
-- [ ] `@supabase/supabase-js` y `@supabase/ssr` aparecen como dependencias en `package.json`.
-- [ ] `.env.example` documenta `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` sin valores reales.
-- [ ] `.env.local` (no versionado) contiene los valores reales del proyecto `okqmxxqnmcqpqzusnype` y no aparece en `git status` como archivo trackeado.
-- [ ] `lib/supabase/client.ts` exporta un `createClient()` funcional para Client Components.
-- [ ] `lib/supabase/server.ts` exporta un `createClient()` funcional para Server Components/Route Handlers, usando cookies de `next/headers`.
-- [ ] Al visitar `/debug/supabase` durante el paso de verificación manual, la llamada a `supabase.auth.getSession()` no lanza error de red ni de credenciales.
-- [ ] `app/debug/supabase/page.tsx` no existe en el estado final del repo (se eliminó tras la verificación).
-- [ ] No se creó ninguna tabla, migración ni política RLS en el proyecto de Supabase.
-- [ ] `npm run lint` y `npm run build` terminan sin errores.
+- [x] `@supabase/supabase-js` y `@supabase/ssr` aparecen como dependencias en `package.json`.
+- [x] `.env.example` documenta `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` sin valores reales.
+- [x] Los valores reales del proyecto `okqmxxqnmcqpqzusnype` están cargados en un archivo de entorno no versionado y no aparecen en `git status` como archivo trackeado. **Desviación acordada con el usuario:** se agregaron al `.env` ya existente en el repo (que ya contenía `RESEND_*`/`SUPABASE_DB_PASSWORD` y ya estaba cubierto por `.gitignore`), en vez de crear un `.env.local` separado como decía el plan original.
+- [x] `lib/supabase/client.ts` exporta un `createClient()` funcional para Client Components.
+- [x] `lib/supabase/server.ts` exporta un `createClient()` funcional para Server Components/Route Handlers, usando cookies de `next/headers`.
+- [x] Al visitar `/debug/supabase` durante el paso de verificación manual, la llamada a `supabase.auth.getSession()` no lanzó error de red ni de credenciales (respondió `OK. session: null`).
+- [x] `app/debug/supabase/page.tsx` no existe en el estado final del repo (se eliminó tras la verificación).
+- [x] No se creó ninguna tabla, migración ni política RLS en el proyecto de Supabase.
+- [x] `npm run build` termina sin errores. **`npm run lint` NO termina sin errores** — falla con 135 errores preexistentes de `no-multiple-empty-lines` (causados por CRLF de Windows, `core.autocrlf=true`) en archivos que esta spec no tocó (`app/layout.tsx`, `components/nav.tsx`, `lib/auth-context.tsx`, etc.). Confirmado como preexistente: ninguno de esos archivos aparece en `git status`. Los archivos nuevos de esta spec (`lib/supabase/client.ts`, `lib/supabase/server.ts`) no generan errores de lint. Arreglar el lint del repo completo queda fuera de esta spec por decisión explícita del usuario.
 
 ## Decisions
 
 - **Sí:** instalar tanto `@supabase/supabase-js` como `@supabase/ssr`, aunque esta spec no implemente auth. Decisión explícita del usuario para dejar el patrón oficial de Next.js App Router (cliente navegador + cliente servidor con cookies) listo para specs futuras.
 - **Sí:** separar `lib/supabase/client.ts` y `lib/supabase/server.ts` en archivos distintos (no un único `lib/supabase.ts`). Pedido explícito del usuario.
 - **Sí:** usar la publishable key moderna (`sb_publishable_...`) en vez de la legacy `anon` JWT. Es la recomendada por Supabase para proyectos nuevos (mejor seguridad, rotación independiente); la legacy queda disponible en el dashboard si hiciera falta en el futuro.
-- **Sí:** cargar `.env.local` con valores reales obtenidos vía MCP (`get_project_url`, `get_publishable_keys`) en esta misma spec, en vez de dejarlo como paso manual del usuario. Decisión explícita del usuario ("vamos a colocar ambas"): tanto `.env.example` (documentación) como `.env.local` (valores reales) se completan aquí.
+- **Sí:** cargar los valores reales obtenidos vía MCP (`get_project_url`, `get_publishable_keys`) en esta misma spec, en vez de dejarlo como paso manual del usuario. Decisión explícita del usuario ("vamos a colocar ambas"): tanto `.env.example` (documentación) como el archivo de entorno real se completan aquí.
+- **Sí (desviación del plan):** los valores reales se agregaron al `.env` ya existente en el repo, no a un `.env.local` nuevo como decía el plan original. Al implementar, se encontró que el repo ya usa `.env` (no `.env.local`) como archivo de secretos reales no versionado (`RESEND_*`, `SUPABASE_DB_PASSWORD` ya vivían ahí), cubierto por `!.env.example` en `.gitignore`. Se consultó al usuario y eligió seguir la convención ya establecida en vez del texto literal de la spec.
+- **No (hallazgo, no decisión):** `npm run lint` queda con 135 errores preexistentes (`no-multiple-empty-lines` por CRLF de Windows) en archivos ajenos a esta spec. Confirmado que no los causó esta spec (no aparecen en `git status`) y que los archivos nuevos (`lib/supabase/*`) no tienen errores. El usuario decidió explícitamente no arreglarlo acá por quedar fuera del alcance de "conectar Supabase".
 - **No:** crear tablas, esquemas o políticas RLS. Pedido explícito del usuario ("lo único que quiero es la conexión, nada de creación de tablas").
 - **No:** implementar autenticación real, tiempo real o edge functions en esta spec. El usuario los mencionó como motivación futura ("por ahora conectar supabase, en un futuro para real time y edge functions"), pero quedan fuera del alcance actual.
 - **No:** agregar `middleware.ts` para refresco de sesión. Es parte del patrón de auth de `@supabase/ssr`, pero no aplica sin auth real implementada todavía.
