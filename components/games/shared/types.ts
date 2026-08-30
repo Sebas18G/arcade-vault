@@ -17,12 +17,12 @@ export type LeaderboardEntry = {
   level: number;
   [key: string]: unknown;
 };
-export type GameCanvasProps = {
+export type GameCanvasProps<TResult extends GameOverResult = GameOverResult> = {
   paused: boolean;
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
   onLevelChange: (level: number) => void;
-  onGameOver: (result: GameOverResult) => void;
+  onGameOver: (result: TResult) => void;
 };
 export type GameCanvasHandle = {
   restart: () => void;

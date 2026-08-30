@@ -1,11 +1,22 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Game } from "@/app/data/games";
 import { useAuth } from "@/lib/auth-context";
 import { addScore } from "@/lib/storage";
 import type { UserSession } from "@/lib/storage";
-import type { LeaderboardEntry } from "@/components/games/shared/types";
+import type {
+  AsteroidsGameOverResult,
+  GameCanvasHandle,
+  LeaderboardEntry,
+} from "@/components/games/shared/types";
+import { AsteroidsCanvas } from "@/components/games/asteroids/asteroids-canvas";
+import {
+  addAsteroidsScore,
+  getAsteroidsLeaderboard,
+  getSavedPlayerName,
+  setSavedPlayerName,
+} from "@/components/games/asteroids/leaderboard";
 const LIVES = 3;
 function GameOverModal({
   game,
@@ -14,6 +25,7 @@ function GameOverModal({
   user,
   leaderboard,
   scoreOnly,
+  defaultName,
   onRestart,
 }: {
   game: Game;
@@ -25,9 +37,12 @@ function GameOverModal({
     onSaveName: (name: string) => void;
   };
   scoreOnly?: boolean;
+  defaultName?: string;
   onRestart: () => void;
 }) {
-  const [name, setName] = useState(() => user?.name ?? "INVITADO");
+  const [name, setName] = useState(
+    () => defaultName ?? user?.name ?? "INVITADO",
+  );
   const [saved, setSaved] = useState(false);
   const saveScore = () => {
     if (leaderboard) {
@@ -106,21 +121,52 @@ function GameOverModal({
 }
 export function GamePlayer({ game }: { game: Game }) {
   const { user } = useAuth();
+  const isAsteroids = game.id === "rocas";
   const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(LIVES);
+  const [engineLevel, setEngineLevel] = useState(1);
   const [paused, setPaused] = useState(false);
   const [over, setOver] = useState(false);
-  const level = Math.floor(score / 2500) + 1;
+  const [asteroidsResult, setAsteroidsResult] =
+    useState<AsteroidsGameOverResult | null>(null);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<
+    LeaderboardEntry[]
+  >([]);
+  const canvasRef = useRef<GameCanvasHandle>(null);
+  const level = isAsteroids ? engineLevel : Math.floor(score / 2500) + 1;
   useEffect(() => {
+    if (isAsteroids) return;
     if (over || paused) return;
     const t = setInterval(() => {
       setScore((s) => s + Math.floor(10 + Math.random() * 90));
     }, 220);
     return () => clearInterval(t);
-  }, [over, paused]);
+  }, [isAsteroids, over, paused]);
   const restart = () => {
     setScore(0);
+    setLives(LIVES);
+    setEngineLevel(1);
     setPaused(false);
     setOver(false);
+    setAsteroidsResult(null);
+    canvasRef.current?.restart();
+  };
+  const handleAsteroidsGameOver = (result: AsteroidsGameOverResult) => {
+    setAsteroidsResult(result);
+    setLeaderboardEntries(getAsteroidsLeaderboard());
+    setOver(true);
+  };
+  const handleForceEnd = () => {
+    if (isAsteroids) {
+      setAsteroidsResult({
+        score,
+        level: engineLevel,
+        asteroidsDestroyed: 0,
+        bestCombo: 0,
+      });
+      setLeaderboardEntries(getAsteroidsLeaderboard());
+    }
+    setOver(true);
   };
   return (
     <div className="av-player fade-in">
@@ -138,7 +184,7 @@ export function GamePlayer({ game }: { game: Game }) {
           </div>
           <div className="hud-stat lives">
             <div className="l">Vidas</div>
-            <div className="v">{"♥ ".repeat(LIVES).trim() || "—"}</div>
+            <div className="v">{"♥ ".repeat(lives).trim() || "—"}</div>
           </div>
           <div className="hud-stat level">
             <div className="l">Nivel</div>
@@ -149,7 +195,7 @@ export function GamePlayer({ game }: { game: Game }) {
           <button className="btn yellow" onClick={() => setPaused((p) => !p)}>
             {paused ? "REANUDAR" : "PAUSA"}
           </button>
-          <button className="btn magenta" onClick={() => setOver(true)}>
+          <button className="btn magenta" onClick={handleForceEnd}>
             FIN
           </button>
           <Link href={`/games/${game.id}`} className="btn ghost">
@@ -159,13 +205,24 @@ export function GamePlayer({ game }: { game: Game }) {
       </div>
       <div className="crt">
         <div className="crt-screen">
-          <div className="game-arena">
-            <div className="grid-floor"></div>
-            <div className="enemy e1"></div>
-            <div className="enemy e2"></div>
-            <div className="enemy e3"></div>
-            <div className="player-ship"></div>
-          </div>
+          {isAsteroids ? (
+            <AsteroidsCanvas
+              ref={canvasRef}
+              paused={paused || over}
+              onScoreChange={setScore}
+              onLivesChange={setLives}
+              onLevelChange={setEngineLevel}
+              onGameOver={handleAsteroidsGameOver}
+            />
+          ) : (
+            <div className="game-arena">
+              <div className="grid-floor"></div>
+              <div className="enemy e1"></div>
+              <div className="enemy e2"></div>
+              <div className="enemy e3"></div>
+              <div className="player-ship"></div>
+            </div>
+          )}
           {paused && (
             <div
               className="crt-content"
@@ -199,8 +256,33 @@ export function GamePlayer({ game }: { game: Game }) {
       {over && (
         <GameOverModal
           game={game}
-          score={score}
+          score={isAsteroids ? (asteroidsResult?.score ?? score) : score}
+          level={
+            isAsteroids ? (asteroidsResult?.level ?? engineLevel) : undefined
+          }
           user={user}
+          defaultName={
+            isAsteroids
+              ? getSavedPlayerName() || user?.name || "INVITADO"
+              : undefined
+          }
+          leaderboard={
+            isAsteroids
+              ? {
+                  entries: leaderboardEntries,
+                  onSaveName: (name) => {
+                    const result = asteroidsResult ?? {
+                      score,
+                      level: engineLevel,
+                      asteroidsDestroyed: 0,
+                      bestCombo: 0,
+                    };
+                    setSavedPlayerName(name);
+                    setLeaderboardEntries(addAsteroidsScore(name, result));
+                  },
+                }
+              : undefined
+          }
           onRestart={restart}
         />
       )}
