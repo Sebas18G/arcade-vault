@@ -1,6 +1,6 @@
 # SPEC 05 — Juegos arcade reales (Asteroids, Tetris, Arkanoid)
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 01
 > **Date:** 2026-08-30
 > **Objective:** Portar los 3 minijuegos de `references/started_games/` (Asteroids, Tetris, Arkanoid) a componentes de canvas en React que reemplacen el reproductor simulado para las entradas `rocas`, `caida` y `bloque-buster` del catálogo, notificando puntaje/vidas/nivel/fin de partida al HUD y al modal de fin de juego ya existentes de `GamePlayer`.
@@ -151,19 +151,26 @@ Arkanoid no define un módulo de leaderboard (no tiene esa función en la refere
 
 ## Acceptance criteria
 
-- [ ] `/games/rocas/play` muestra el Asteroids real dentro del `crt-screen`: nave controlable, disparo, asteroides que se dividen al ser destruidos, power-ups y estrella fugaz presentes, 3 vidas con invencibilidad temporal.
-- [ ] `/games/caida/play` muestra el Tetris real: tablero 10×20, las 7 piezas, wall kicks, soft/hard drop, ghost piece, preview de siguiente pieza, niveles que suben cada 10 líneas, selector de tema claro/oscuro y de skin funcionando.
-- [ ] `/games/bloque-buster/play` muestra el Arkanoid real: paleta controlable con teclado y mouse, pelota, bloques con sprites, bloques indestructibles, explosiones animadas, sonidos de rebote/rotura, niveles hasta 15.
-- [ ] En los 3 juegos, el HUD de `GamePlayer` (Puntuación/Vidas/Nivel) refleja en vivo el estado real del motor, no valores simulados.
-- [ ] El botón PAUSA detiene el motor del juego (el estado no avanza mientras está en pausa) y REANUDAR lo continúa donde quedó.
-- [ ] Al terminar una partida de Asteroids o Tetris, el modal de fin de juego muestra el top-N propio de ese juego (leído de `localStorage`) y permite guardar el nombre; el puntaje **no** se guarda en `av_scores`.
-- [ ] Al terminar una partida de Arkanoid, el modal de fin de juego muestra el puntaje y nivel final, sin tabla de puntajes ni campo de nombre.
-- [ ] "JUGAR DE NUEVO" reinicia el motor del juego real a su estado inicial (no solo resetea el puntaje simulado).
-- [ ] "SALIR" desmonta el juego sin dejar listeners de teclado/mouse activos ni el loop de animación corriendo en segundo plano (verificable navegando a otra pantalla y confirmando que no hay errores ni consumo de CPU sostenido).
-- [ ] Los otros 5 juegos del catálogo (`serpentina`, `gloton`, `invasores`, `ranaria`, `duelo-pixel`) siguen usando el reproductor simulado exactamente como antes de esta spec.
-- [ ] Ninguna variable CSS (`:root`) ni clase de `document.body` de los juegos portados afecta la apariencia del resto de la app (verificado navegando a otra pantalla después de jugar Tetris con el tema claro/skin alternativo activado).
-- [ ] Los canvases no desbordan el contenedor en un viewport angosto (probado en DevTools).
-- [ ] `npm run build` termina sin errores. `npm run lint` no introduce errores nuevos respecto al estado actual del repo (ver hallazgo preexistente de CRLF documentado en la spec 04).
+- [x] `/games/rocas/play` muestra el Asteroids real dentro del `crt-screen`: nave controlable, disparo, asteroides que se dividen al ser destruidos, power-ups y estrella fugaz presentes¹, 3 vidas con invencibilidad temporal.
+- [x] `/games/caida/play` muestra el Tetris real: tablero 10×20, las 7 piezas², wall kicks, soft/hard drop, ghost piece, preview de siguiente pieza, niveles que suben cada 10 líneas, selector de tema claro/oscuro y de skin funcionando.
+- [x] `/games/bloque-buster/play` muestra el Arkanoid real: paleta controlable con teclado y mouse, pelota, bloques con sprites, bloques indestructibles, explosiones animadas, sonidos de rebote/rotura, niveles hasta 15.
+- [x] En los 3 juegos, el HUD de `GamePlayer` (Puntuación/Vidas/Nivel) refleja en vivo el estado real del motor, no valores simulados.
+- [x] El botón PAUSA detiene el motor del juego (el estado no avanza mientras está en pausa) y REANUDAR lo continúa donde quedó.
+- [x] Al terminar una partida de Asteroids o Tetris, el modal de fin de juego muestra el top-N propio de ese juego (leído de `localStorage`) y permite guardar el nombre; el puntaje **no** se guarda en `av_scores`.
+- [x] Al terminar una partida de Arkanoid, el modal de fin de juego muestra el puntaje y nivel final, sin tabla de puntajes ni campo de nombre.
+- [x] "JUGAR DE NUEVO" reinicia el motor del juego real a su estado inicial (no solo resetea el puntaje simulado).
+- [x] "SALIR" desmonta el juego sin dejar listeners de teclado/mouse activos ni el loop de animación corriendo en segundo plano (verificable navegando a otra pantalla y confirmando que no hay errores ni consumo de CPU sostenido).
+- [x] Los otros 5 juegos del catálogo (`serpentina`, `gloton`, `invasores`, `ranaria`, `duelo-pixel`) siguen usando el reproductor simulado exactamente como antes de esta spec.
+- [x] Ninguna variable CSS (`:root`) ni clase de `document.body` de los juegos portados afecta la apariencia del resto de la app (verificado navegando a otra pantalla después de jugar Tetris con el tema claro/skin alternativo activado).
+- [x] Los canvases no desbordan el contenedor en un viewport angosto (probado en DevTools).
+- [x] `npm run build` termina sin errores. `npm run lint` no introduce errores nuevos respecto al estado actual del repo (ver hallazgo preexistente de CRLF documentado en la spec 04).
+
+**Notas de implementación (desviaciones documentadas y aprobadas explícitamente por el usuario durante la implementación):**
+
+1. **Estrella fugaz (Asteroids):** no existe en `references/started_games/02-asteroids/game.js` — es copy desactualizado del `README.md` de esa referencia. Por decisión explícita del usuario ("lo que está en las funcionalidades de los juegos se conserva, no debes desarrollar nada"), no se implementó como funcionalidad nueva. El resto del criterio (nave, disparo, asteroides que se dividen, power-ups, 3 vidas con invencibilidad) está completo.
+2. **Piezas de Tetris:** el motor porta el juego completo tal como está en `game.js`, que incluye más de las "7 piezas" resumidas en el Scope — también 3 pentominós, una pieza de recompensa y una pieza reto, además de 5 power-ups (bomba, rayo, tinte, gravedad, congelar) y sonido real (Web Audio API), pese a que el "Out of scope" de esta spec decía erróneamente que Tetris no tenía sonido. Se portó todo por la misma decisión explícita del usuario de preservar la funcionalidad real de la referencia.
+
+Verificación final cruzada (2026-08-30): `npm run build` y `npm run lint` limpios (sin errores nuevos), los 8 juegos + las 8 fichas de detalle recorridos en una sesión de navegador sin un solo error de consola. Durante esta verificación se encontró y corrigió un bug de hydration mismatch en `TetrisCanvas` (el tema/skin se leían de `localStorage` en el `useState` inicial, divergiendo entre servidor y cliente); ahora se corrigen en un `useEffect` posterior a la hidratación.
 
 ## Decisions
 

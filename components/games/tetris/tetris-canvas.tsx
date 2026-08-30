@@ -64,8 +64,11 @@ export const TetrisCanvas = forwardRef<
     onLevelChange,
     onGameOver,
   });
-  const [theme, setTheme] = useState<"dark" | "light">(() => getTetrisTheme());
-  const [skin, setSkin] = useState<TetrisSkin>(() => getTetrisSkin());
+  // Arrancan en el default "seguro para SSR" (el servidor no tiene localStorage)
+  // y se corrigen en un useEffect post-hidratación para no producir un
+  // hydration mismatch cuando el usuario ya tenía guardada otra preferencia.
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [skin, setSkin] = useState<TetrisSkin>("retro");
   const [lines, setLines] = useState(0);
   const [combo, setCombo] = useState(0);
   const [freezeMs, setFreezeMs] = useState(0);
@@ -96,6 +99,10 @@ export const TetrisCanvas = forwardRef<
       onGameOver,
     };
   }, [onScoreChange, onLivesChange, onLevelChange, onGameOver]);
+  useEffect(() => {
+    setTheme(getTetrisTheme());
+    setSkin(getTetrisSkin());
+  }, []);
   useEffect(() => {
     const canvas = boardCanvasRef.current;
     const ctx = canvas?.getContext("2d");
