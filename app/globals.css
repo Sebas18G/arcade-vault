@@ -327,6 +327,26 @@ a {
   }
 }
 
+@media (max-width: 480px) {
+  .av-nav {
+    gap: 10px;
+  }
+  .av-nav .auth-btn {
+    margin-left: 0;
+    padding: 10px 14px;
+  }
+  .av-nav .hamburger {
+    padding: 10px 14px;
+  }
+}
+
+@media (max-width: 400px) {
+  .av-nav {
+    gap: 6px;
+    padding: 12px 10px;
+  }
+}
+
 .av-mobile-panel {
   position: fixed;
   inset: 0 0 0 auto;
