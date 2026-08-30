@@ -1,5 +1,5 @@
 // Puerto tipado de references/snake-assets/sprites.js (mismas coordenadas de las 21 frutas)
-export const FRUIT_ATLAS_SRC = "/games/serpentina/fruits.png";
+export const FRUIT_ATLAS_SRC = "/games/snake/fruits.png";
 export type FruitSprite = { x: number; y: number; w: number; h: number };
 export const FRUITS: Record<string, FruitSprite> = {
   banana: { x: 34, y: 136, w: 110, h: 160 },

@@ -1,7 +1,12 @@
 import type { GameOverResult } from "@/components/games/shared/types";
-import { FRUITS, FRUIT_NAMES, type FruitSprite } from "./sprite-atlas";
-export const SERPENTINA_WIDTH = 800;
-export const SERPENTINA_HEIGHT = 800;
+import {
+  FRUITS,
+  FRUIT_ATLAS_SRC,
+  FRUIT_NAMES,
+  type FruitSprite,
+} from "./sprite-atlas";
+export const SNAKE_WIDTH = 800;
+export const SNAKE_HEIGHT = 800;
 export const GRID_SIZE = 20; // celdas por lado
 export const CELL_PX = 40; // 20 * 40 = 800
 export type Direction = "UP" | "DOWN" | "LEFT" | "RIGHT";
@@ -48,21 +53,21 @@ function loadFruitAtlas(): Promise<void> {
       resolve();
     };
     img.onerror = () => {
-      console.error("Failed to load Serpentina fruit atlas");
+      console.error("Failed to load Snake fruit atlas");
       resolve();
     };
-    img.src = "/games/serpentina/fruits.png";
+    img.src = FRUIT_ATLAS_SRC;
   });
   return fruitImgLoading;
 }
-export type SerpentinaEngineCallbacks = {
+export type SnakeEngineCallbacks = {
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
   onLevelChange: (level: number) => void;
   onGameOver: (result: GameOverResult) => void;
 };
-export class SerpentinaEngine {
-  private callbacks: SerpentinaEngineCallbacks;
+export class SnakeEngine {
+  private callbacks: SnakeEngineCallbacks;
   private paused = false;
   private screen: "playing" | "gameover" = "playing";
   private score = 0;
@@ -73,7 +78,7 @@ export class SerpentinaEngine {
   private pendingDirection: Direction = INITIAL_DIRECTION;
   private fruit: { pos: GridPoint; name: string } | null = null;
   private moveAccumulator = 0;
-  constructor(callbacks: SerpentinaEngineCallbacks) {
+  constructor(callbacks: SnakeEngineCallbacks) {
     this.callbacks = callbacks;
     loadFruitAtlas();
     this.restart();
@@ -190,11 +195,11 @@ export class SerpentinaEngine {
     for (let i = 0; i <= GRID_SIZE; i++) {
       ctx.beginPath();
       ctx.moveTo(i * CELL_PX, 0);
-      ctx.lineTo(i * CELL_PX, SERPENTINA_HEIGHT);
+      ctx.lineTo(i * CELL_PX, SNAKE_HEIGHT);
       ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(0, i * CELL_PX);
-      ctx.lineTo(SERPENTINA_WIDTH, i * CELL_PX);
+      ctx.lineTo(SNAKE_WIDTH, i * CELL_PX);
       ctx.stroke();
     }
   }
@@ -242,12 +247,12 @@ export class SerpentinaEngine {
     ctx.fillText(`PUNTAJE ${this.score}`, 10, 10);
     ctx.fillStyle = "#fff";
     ctx.textAlign = "right";
-    ctx.fillText(`NIVEL ${this.level}`, SERPENTINA_WIDTH - 10, 10);
+    ctx.fillText(`NIVEL ${this.level}`, SNAKE_WIDTH - 10, 10);
     ctx.shadowBlur = 0;
   }
   draw(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = BG_COLOR;
-    ctx.fillRect(0, 0, SERPENTINA_WIDTH, SERPENTINA_HEIGHT);
+    ctx.fillRect(0, 0, SNAKE_WIDTH, SNAKE_HEIGHT);
     this.drawGrid(ctx);
     this.drawFruit(ctx);
     this.drawSnake(ctx);

@@ -1,9 +1,9 @@
 "use client";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import {
-  SerpentinaEngine,
-  SERPENTINA_WIDTH,
-  SERPENTINA_HEIGHT,
+  SnakeEngine,
+  SNAKE_WIDTH,
+  SNAKE_HEIGHT,
   type Direction,
 } from "./engine";
 import type {
@@ -33,15 +33,15 @@ function directionFromKey(key: string): Direction | null {
       return null;
   }
 }
-export const SerpentinaCanvas = forwardRef<
+export const SnakeCanvas = forwardRef<
   GameCanvasHandle,
   GameCanvasProps<GameOverResult>
->(function SerpentinaCanvas(
+>(function SnakeCanvas(
   { paused, onScoreChange, onLivesChange, onLevelChange, onGameOver },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<SerpentinaEngine | null>(null);
+  const engineRef = useRef<SnakeEngine | null>(null);
   const callbacksRef = useRef({
     onScoreChange,
     onLivesChange,
@@ -60,7 +60,7 @@ export const SerpentinaCanvas = forwardRef<
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const engine = new SerpentinaEngine({
+    const engine = new SnakeEngine({
       onScoreChange: (score) => callbacksRef.current.onScoreChange(score),
       onLivesChange: (lives) => callbacksRef.current.onLivesChange(lives),
       onLevelChange: (level) => callbacksRef.current.onLevelChange(level),
@@ -105,11 +105,5 @@ export const SerpentinaCanvas = forwardRef<
   useImperativeHandle(ref, () => ({
     restart: () => engineRef.current?.restart(),
   }));
-  return (
-    <canvas
-      ref={canvasRef}
-      width={SERPENTINA_WIDTH}
-      height={SERPENTINA_HEIGHT}
-    />
-  );
+  return <canvas ref={canvasRef} width={SNAKE_WIDTH} height={SNAKE_HEIGHT} />;
 });

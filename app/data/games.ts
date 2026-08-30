@@ -34,8 +34,8 @@ export const GAMES: Game[] = [
     plays: "31.8K",
   },
   {
-    id: "serpentina",
-    title: "SERPENTINA",
+    id: "snake",
+    title: "SNAKE",
     short: "Crece sin morder tu propia cola.",
     long: "Una serpiente de luz recorre la grilla buscando núcleos magenta. Cada bocado la alarga y la hace más veloz. Un movimiento en falso y se devora a sí misma.",
     cat: "ARCADE",
