@@ -27,6 +27,14 @@ export type ArkanoidScoreRow = {
   user_id: string | null;
   created_at: string;
 };
+export type SnakeScoreRow = {
+  id: string;
+  player_name: string;
+  score: number;
+  level: number;
+  user_id: string | null;
+  created_at: string;
+};
 export type GlobalScoreRow = {
   id: string;
   game_id: string;

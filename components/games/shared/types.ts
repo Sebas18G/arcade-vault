@@ -10,6 +10,7 @@ export type TetrisGameOverResult = GameOverResult & {
   lines: number;
   bestCombo: number;
 };
+export type SnakeGameOverResult = GameOverResult; // sin stats extra, igual que Arkanoid
 export type LeaderboardEntry = {
   id: string;
   name: string;

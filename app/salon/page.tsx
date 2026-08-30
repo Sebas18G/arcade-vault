@@ -8,6 +8,7 @@ const SCORE_TABLE: Record<string, string> = {
   asteroids: "asteroids_scores",
   tetris: "tetris_scores",
   arkanoid: "arkanoid_scores",
+  snake: "snake_scores",
 };
 type SalonRow = { id: string; name: string; score: number; date: string };
 function formatDate(iso: string): string {
