@@ -3,9 +3,9 @@ import Link from "next/link";
 import { GAMES, seededScores } from "@/app/data/games";
 import { createClient } from "@/lib/supabase/server";
 const SCORE_TABLE: Record<string, string> = {
-  rocas: "asteroids_scores",
-  caida: "tetris_scores",
-  "bloque-buster": "arkanoid_scores",
+  asteroids: "asteroids_scores",
+  tetris: "tetris_scores",
+  arkanoid: "arkanoid_scores",
 };
 type DetailScoreRow = {
   key: string;

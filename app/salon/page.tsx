@@ -5,9 +5,9 @@ import { useAuth } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import type { GameRow } from "@/lib/supabase/types";
 const SCORE_TABLE: Record<string, string> = {
-  rocas: "asteroids_scores",
-  caida: "tetris_scores",
-  "bloque-buster": "arkanoid_scores",
+  asteroids: "asteroids_scores",
+  tetris: "tetris_scores",
+  arkanoid: "arkanoid_scores",
 };
 type SalonRow = { id: string; name: string; score: number; date: string };
 function formatDate(iso: string): string {

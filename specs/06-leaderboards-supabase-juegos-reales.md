@@ -21,7 +21,8 @@ La spec 05 dejó explícitamente fuera de alcance conectar los leaderboards de A
 - Refactor de `components/games/asteroids/leaderboard.ts` y `components/games/tetris/leaderboard.ts`: `getXLeaderboard()`/`addXScore()` pasan de `localStorage` síncrono a Supabase asíncrono (fetch top-5 / insert). Los helpers de tema/skin/nombre guardado (`tetris-theme`, `tetris-skin`, `asteroids_player_name`, etc.) **no** se tocan, siguen en `localStorage` (son preferencias de UI, no puntajes).
 - `components/games/arkanoid/leaderboard.ts` nuevo (no existía): mismo contrato que los otros 2, respaldado por `arkanoid_scores`.
 - `GameOverModal`/`GamePlayer` (`components/game-player.tsx`): Arkanoid deja de ser `scoreOnly` — pasa a tener campo de nombre y su propio top-5, igual que Asteroids/Tetris. Las 3 rutas de guardado/lectura pasan a ser asíncronas (estado de carga mientras se guarda/lee; si Supabase falla, se muestra un mensaje de error inline sin romper el modal ni bloquear "JUGAR DE NUEVO"/"SALIR").
-- Renombrar en `app/data/games.ts` el campo `title` de las 3 entradas reales: `rocas` → `"ASTEROIDS"`, `caida` → `"TETRIS"`, `bloque-buster` → `"ARKANOID"`. El resto de los campos de esas 3 entradas (`id`, `short`, `long`, `cover`, `color`, `best`, `plays`) y las otras 5 entradas del catálogo no cambian.
+- Renombrar en `app/data/games.ts` el campo `title` de las 3 entradas reales: `rocas` → `"ASTEROIDS"`, `caida` → `"TETRIS"`, `bloque-buster` → `"ARKANOID"`. El resto de los campos de esas 3 entradas (`short`, `long`, `cover`, `color`, `best`, `plays`) y las otras 5 entradas del catálogo no cambian.
+- **(Revisado tras implementar, ver Decisions)** El `id` (slug de ruta) de las 3 entradas reales también se renombra para que coincida con el motor/título: `rocas` → `asteroids`, `caida` → `tetris`, `bloque-buster` → `arkanoid`. Afecta rutas (`/games/[id]`, `/games/[id]/play`), los checks `game.id === "..."` en `GamePlayer`, el mapa `SCORE_TABLE` en `app/salon/page.tsx` y `app/games/[id]/page.tsx`, y las filas de la tabla `games`/`global_scores.game_id` en Supabase (migradas preservando el historial ya guardado). Los ids de los 5 juegos simulados no cambian.
 - `app/salon/page.tsx` reescrito (misma ruta `/salon`, no se renombra):
   - Los tabs por juego se construyen con un fetch a la tabla `games` de Supabase (client-side, `lib/supabase/client.ts`) en vez de iterar `GAMES`. Solo aparecen tabs para los juegos presentes en `games` (los 3 reales); los 5 juegos simulados dejan de tener tab en el Salón (siguen jugables normalmente, solo pierden esta tabla).
   - Al activar un tab de juego, fetch client-side del top-12 de la tabla de scores correspondiente (`asteroids_scores`/`tetris_scores`/`arkanoid_scores`, según el `id` del juego activo) ordenado por `score desc`. Estado vacío ("AÚN SIN PUNTAJES") si no hay filas.
@@ -39,7 +40,7 @@ La spec 05 dejó explícitamente fuera de alcance conectar los leaderboards de A
 - Migrar los puntajes que ya existan en `localStorage` (`asteroids_leaderboard_v1`, `tetris-highscores`) hacia Supabase. Las tablas nuevas arrancan vacías; esas claves de `localStorage` quedan sin uso (no se leen ni se borran).
 - Validación anti-cheat de puntajes (rate limiting, verificación server-side de que el score es alcanzable). El modelo de confianza es el mismo que ya existía en `localStorage`: el cliente reporta su propio puntaje sin verificación de servidor, solo con constraints básicos de forma (`player_name` 1–10 caracteres, `score >= 0`).
 - Suscripción Realtime dentro del modal de fin de partida (`GameOverModal`): el modal hace un fetch puntual al terminar la partida y un insert al guardar; no queda "escuchando" nuevas filas mientras está abierto. El Realtime en vivo aplica solo al Salón (spec actual).
-- Cambiar el `id` (slug de ruta) de `rocas`/`caida`/`bloque-buster`, o renombrar la ruta `/salon`. Solo cambia el `title` visible.
+- ~~Cambiar el `id` (slug de ruta) de `rocas`/`caida`/`bloque-buster`~~ **(revertido tras implementar, ver Decisions: sí se cambió, a petición explícita del usuario)**. Renombrar la ruta `/salon` sigue fuera de alcance.
 - Actualizar `short`/`long`/`cover`/`color`/`best`/`plays` del catálogo para los 3 juegos reales, más allá del reemplazo de `best` ya descrito en la ficha de detalle (el campo en `app/data/games.ts` no se edita).
 - Actualizar `CLAUDE.md` con el nuevo estado implementado (se hace en un commit posterior, como en specs anteriores).
 - Tests automatizados (no hay test runner configurado todavía).
@@ -48,8 +49,10 @@ La spec 05 dejó explícitamente fuera de alcance conectar los leaderboards de A
 
 ```sql
 -- Catálogo mínimo, solo para construir los tabs del Salón (no reemplaza app/data/games.ts)
+-- Nota: 'id' se renombró tras la implementación inicial (ver Decisions) de
+-- 'rocas'/'caida'/'bloque-buster' a 'asteroids'/'tetris'/'arkanoid'.
 create table games (
-  id text primary key,           -- 'rocas' | 'caida' | 'bloque-buster'
+  id text primary key,           -- 'asteroids' | 'tetris' | 'arkanoid'
   title text not null,           -- 'ASTEROIDS' | 'TETRIS' | 'ARKANOID'
   created_at timestamptz not null default now()
 );
@@ -109,11 +112,11 @@ end;
 $$;
 
 create trigger asteroids_mirror after insert on asteroids_scores
-  for each row execute function mirror_to_global_scores('rocas');
+  for each row execute function mirror_to_global_scores('asteroids');
 create trigger tetris_mirror after insert on tetris_scores
-  for each row execute function mirror_to_global_scores('caida');
+  for each row execute function mirror_to_global_scores('tetris');
 create trigger arkanoid_mirror after insert on arkanoid_scores
-  for each row execute function mirror_to_global_scores('bloque-buster');
+  for each row execute function mirror_to_global_scores('arkanoid');
 ```
 
 ```ts
@@ -166,25 +169,26 @@ export type GlobalScoreRow = {
 4. Repetir el paso 3 para Tetris (`components/games/tetris/leaderboard.ts` contra `tetris_scores`). Verificación manual equivalente.
 5. Crear `components/games/arkanoid/leaderboard.ts` nuevo (contra `arkanoid_scores`) y actualizar `GameOverModal`/`GamePlayer` para que Arkanoid deje de ser `scoreOnly`: agrega campo de nombre y top-5 igual que los otros dos. Verificación manual equivalente.
 6. Renombrar los 3 títulos en `app/data/games.ts`. Verificación: `/games` muestra "ASTEROIDS", "TETRIS", "ARKANOID" en las cards correspondientes; los otros 5 títulos no cambian.
+   6b. **(Agregado tras implementar, ver Decisions)** Renombrar los 3 `id` (`rocas`→`asteroids`, `caida`→`tetris`, `bloque-buster`→`arkanoid`) en `app/data/games.ts`, `GamePlayer` y los mapas `SCORE_TABLE`; migración en Supabase que reapunta `games`/`global_scores.game_id` sin perder el historial y recrea los triggers de espejo. Verificación: `/games/asteroids`, `/games/tetris`, `/games/arkanoid` responden 200 y muestran datos reales; `/games/rocas`, `/games/caida`, `/games/bloque-buster` responden 404.
 7. Reescribir `app/salon/page.tsx`: fetch de `games` para los tabs, fetch client-side de top-12 al cambiar de tab, "tu mejor marca" con datos reales, suscripción Realtime por tab activo con cleanup al cambiar/desmontar. Sin tab `GLOBAL` (ver Decisions). Verificación manual: `/salon` muestra solo 3 tabs (Asteroids/Tetris/Arkanoid); jugar una partida en otra pestaña del navegador y confirmar que el puntaje nuevo aparece en el Salón sin recargar la página.
-8. Actualizar `app/games/[id]/page.tsx`: fetch server-side del top-12 real para los 3 juegos reales (`best` recalculado), sin tocar los otros 5. Verificación manual: `/games/rocas`, `/games/caida`, `/games/bloque-buster` muestran el leaderboard real; `/games/gloton` (por ejemplo) sigue mostrando `seededScores` sin cambios.
-9. Verificación final: recorrer los 3 juegos de punta a punta (jugar, guardar, ver reflejado en modal/ficha/Salón/tab Global), confirmar que los 5 juegos simulados y su flujo de `av_scores` no cambiaron, y correr `npm run lint` y `npm run build` sin errores nuevos.
+8. Actualizar `app/games/[id]/page.tsx`: fetch server-side del top-12 real para los 3 juegos reales (`best` recalculado), sin tocar los otros 5. Verificación manual: `/games/rocas`, `/games/caida`, `/games/bloque-buster` (ids originales; renombrados a `/games/asteroids`, `/games/tetris`, `/games/arkanoid` en el paso 6b) muestran el leaderboard real; `/games/gloton` (por ejemplo) sigue mostrando `seededScores` sin cambios.
+9. Verificación final: recorrer los 3 juegos de punta a punta (jugar, guardar, ver reflejado en modal/ficha/Salón), confirmar que los 5 juegos simulados y su flujo de `av_scores` no cambiaron, y correr `npm run lint` y `npm run build` sin errores nuevos.
 
 ## Acceptance criteria
 
-- [ ] Las 5 tablas (`games`, `asteroids_scores`, `tetris_scores`, `arkanoid_scores`, `global_scores`) existen en Supabase con RLS habilitado y las policies descritas.
-- [ ] Insertar una fila en cualquiera de las 3 tablas de juego produce automáticamente una fila espejo en `global_scores` (vía trigger), sin que el cliente haga un segundo insert.
-- [ ] El cliente (rol anónimo) puede hacer `SELECT` en las 5 tablas pero **no** puede insertar directamente en `games` ni en `global_scores`.
-- [ ] Al terminar una partida de Asteroids, Tetris o Arkanoid, el modal de fin de juego permite guardar el nombre y el puntaje queda persistido en la tabla de Supabase correspondiente (verificable en el Table Editor).
-- [ ] El modal de fin de juego de Arkanoid ahora tiene campo de nombre y muestra su propio top-5, igual que Asteroids y Tetris (antes solo mostraba puntaje/nivel).
-- [ ] `/games` muestra "ASTEROIDS", "TETRIS" y "ARKANOID" como títulos de esas 3 cards; los otros 5 títulos no cambiaron.
-- [ ] `/salon` muestra exactamente 3 tabs: uno por cada juego presente en la tabla `games` (los 3 reales). No hay tab `GLOBAL` (ver Decisions) y los 5 juegos simulados no tienen tab.
-- [ ] Jugar una partida en una pestaña del navegador y guardarla hace aparecer el nuevo puntaje en `/salon` (tab de ese juego) abierto en otra pestaña, sin recargar la página (verificado con la suscripción Realtime).
-- [ ] Con sesión iniciada, "TU MEJOR MARCA" en cada tab de juego real refleja el mejor puntaje real guardado con ese nombre (no un valor inventado); si no hay ninguno, la sección no se muestra.
-- [ ] `/games/rocas`, `/games/caida` y `/games/bloque-buster` muestran el top-12 real de Supabase en "MEJORES PUNTUACIONES" y el valor de "Mejor global" refleja el puntaje más alto real cuando existe.
-- [ ] `/games/serpentina` (y los otros 4 juegos simulados) siguen mostrando `seededScores` exactamente como antes de esta spec, y su flujo de `av_scores` en el reproductor no cambió.
-- [ ] Si Supabase no responde (red caída), el modal de fin de juego muestra un error inline sin romper "JUGAR DE NUEVO" ni "SALIR".
-- [ ] `npm run build` termina sin errores. `npm run lint` no introduce errores nuevos respecto al estado actual del repo.
+- [x] Las 5 tablas (`games`, `asteroids_scores`, `tetris_scores`, `arkanoid_scores`, `global_scores`) existen en Supabase con RLS habilitado y las policies descritas. (Nota: viven en el schema `arcade-vault`, no en `public` — ver Decisions/hallazgo del paso 3.)
+- [x] Insertar una fila en cualquiera de las 3 tablas de juego produce automáticamente una fila espejo en `global_scores` (vía trigger), sin que el cliente haga un segundo insert.
+- [x] El cliente (rol anónimo) puede hacer `SELECT` en las 5 tablas pero **no** puede insertar directamente en `games` ni en `global_scores`.
+- [x] Al terminar una partida de Asteroids, Tetris o Arkanoid, el modal de fin de juego permite guardar el nombre y el puntaje queda persistido en la tabla de Supabase correspondiente (verificable en el Table Editor). Confirmado con partidas reales jugadas durante la implementación (jugador "SEBAS" en las 3 tablas).
+- [x] El modal de fin de juego de Arkanoid ahora tiene campo de nombre y muestra su propio top-5, igual que Asteroids y Tetris (antes solo mostraba puntaje/nivel).
+- [x] `/games` muestra "ASTEROIDS", "TETRIS" y "ARKANOID" como títulos de esas 3 cards; los otros 5 títulos no cambiaron.
+- [x] `/salon` muestra exactamente 3 tabs: uno por cada juego presente en la tabla `games` (los 3 reales). No hay tab `GLOBAL` (ver Decisions) y los 5 juegos simulados no tienen tab.
+- [ ] Jugar una partida en una pestaña del navegador y guardarla hace aparecer el nuevo puntaje en `/salon` (tab de ese juego) abierto en otra pestaña, sin recargar la página (verificado con la suscripción Realtime). **No verificado con dos pestañas reales de navegador** (sin herramienta de navegador en esta sesión); sí se verificó que la suscripción usa el schema/tabla correctos, que la tabla está en la publicación `supabase_realtime`, y que las policies de `SELECT` permiten al rol `anon` ver las filas (requisito para que Realtime entregue eventos). Pendiente de confirmación manual por el usuario.
+- [x] Con sesión iniciada, "TU MEJOR MARCA" en cada tab de juego real refleja el mejor puntaje real guardado con ese nombre (no un valor inventado); si no hay ninguno, la sección no se muestra.
+- [x] `/games/asteroids`, `/games/tetris` y `/games/arkanoid` (ids renombrados, ver Decisions) muestran el top-12 real de Supabase en "MEJORES PUNTUACIONES" y el valor de "Mejor global" refleja el puntaje más alto real cuando existe.
+- [x] `/games/serpentina` (y los otros 4 juegos simulados) siguen mostrando `seededScores` exactamente como antes de esta spec, y su flujo de `av_scores` en el reproductor no cambió.
+- [ ] Si Supabase no responde (red caída), el modal de fin de juego muestra un error inline sin romper "JUGAR DE NUEVO" ni "SALIR". **Verificado por revisión de código** (estado `saveError`/`fetchError` en `GameOverModal`, catch en los 3 flujos de guardado/lectura), no con una caída de red real inducida.
+- [x] `npm run build` termina sin errores. `npm run lint` no introduce errores nuevos respecto al estado actual del repo (105 errores preexistentes sin relación, frente a 123 antes de esta spec — ninguno en archivos tocados).
 
 ## Decisions
 
@@ -202,6 +206,7 @@ export type GlobalScoreRow = {
 - **Sí (decisión del autor de la spec, ajustable):** la ficha de detalle (`/games/[id]`) de los 3 juegos reales también pasa a leer Supabase (incluye el valor de "Mejor global"). Es consistencia gratis dado que la query ya existe para el Salón; evita que la ficha muestre un puntaje inventado que contradiga el modal/Salón reales.
 - **No:** el modal de fin de juego (`GameOverModal`) no mantiene una suscripción Realtime abierta mientras está visible; solo hace un fetch puntual al terminar la partida y un insert al guardar. El Realtime en vivo se reserva para el Salón, donde tiene sentido ver puntajes de otros jugadores mientras se navega. Simplifica el ciclo de vida del modal (se abre y cierra rápido, no vale la pena una suscripción de vida tan corta).
 - **No:** no se agrega validación anti-cheat de puntajes en el servidor (rate limiting, verificación de que el score es alcanzable). Mismo modelo de confianza que ya existía con `localStorage` — el cliente reporta su propio puntaje sin verificación; documentado como riesgo aceptado.
+- **Sí (revierte una decisión previa de esta misma spec):** los `id` de los 3 juegos reales se renombran de `rocas`/`caida`/`bloque-buster` a `asteroids`/`tetris`/`arkanoid`. Decisión explícita del usuario tras ver la app funcionando ("los ids... deberían ser acorde a los juegos implementados"), pedida otra vez sin ambigüedad después de que se le recordara que estaba fuera de alcance ("no aquí mismo cambielo"). Implica: migración en Supabase que inserta las 3 filas nuevas en `games` con el id definitivo, reapunta `global_scores.game_id` del historial ya guardado (sin perder datos) y borra las filas viejas; se recrean los 3 triggers de espejo con el literal de `game_id` actualizado; y en el código se actualizan `app/data/games.ts` (`id`), los checks `game.id === "..."` en `GamePlayer`, y el mapa `SCORE_TABLE` en `app/salon/page.tsx`/`app/games/[id]/page.tsx`. La ruta `/salon` y los ids de los 5 juegos simulados no cambian.
 
 ## Risks
 
@@ -219,7 +224,7 @@ export type GlobalScoreRow = {
 - Migración de los puntajes existentes en `localStorage` hacia Supabase.
 - Validación anti-cheat de puntajes en el servidor.
 - Realtime dentro del modal de fin de juego (solo aplica al Salón).
-- Renombrar rutas (`/salon`) o los `id` de los juegos.
+- Renombrar la ruta `/salon`. (Los `id` de los 3 juegos reales sí se renombraron — ver Decisions.)
 - Actualizar `CLAUDE.md`.
 - Tests automatizados.
 

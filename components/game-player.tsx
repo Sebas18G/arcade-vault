@@ -177,9 +177,9 @@ function GameOverModal({
 }
 export function GamePlayer({ game }: { game: Game }) {
   const { user } = useAuth();
-  const isAsteroids = game.id === "rocas";
-  const isTetris = game.id === "caida";
-  const isArkanoid = game.id === "bloque-buster";
+  const isAsteroids = game.id === "asteroids";
+  const isTetris = game.id === "tetris";
+  const isArkanoid = game.id === "arkanoid";
   const isPortedGame = isAsteroids || isTetris || isArkanoid;
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(LIVES);

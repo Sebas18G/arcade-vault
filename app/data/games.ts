@@ -12,7 +12,7 @@ export type Game = {
 };
 export const GAMES: Game[] = [
   {
-    id: "bloque-buster",
+    id: "arkanoid",
     title: "ARKANOID",
     short: "Rebota la pelota y destruye muros de neón.",
     long: "Pilota una nave-paleta y rebota un núcleo de plasma para pulverizar muros de bloques cromáticos. Cada nivel reorganiza la grilla en patrones imposibles. ¿Hasta dónde llegará tu racha?",
@@ -23,7 +23,7 @@ export const GAMES: Game[] = [
     plays: "12.4K",
   },
   {
-    id: "caida",
+    id: "tetris",
     title: "TETRIS",
     short: "Encaja las piezas antes de que el techo te aplaste.",
     long: "Piezas geométricas descienden desde la oscuridad. Rótalas, encástralas y limpia líneas para sobrevivir. La velocidad aumenta sin piedad cada 10 líneas.",
@@ -67,7 +67,7 @@ export const GAMES: Game[] = [
     plays: "18.0K",
   },
   {
-    id: "rocas",
+    id: "asteroids",
     title: "ASTEROIDS",
     short: "Pulveriza asteroides en gravedad cero.",
     long: "Tu nave triangular flota en vacío absoluto. Dispara y rota para dividir rocas en fragmentos cada vez más pequeños. Cuidado con los OVNIs en el horizonte.",
