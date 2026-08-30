@@ -9,7 +9,7 @@ import {
 import type {
   GameCanvasHandle,
   GameCanvasProps,
-  GameOverResult,
+  SnakeGameOverResult,
 } from "@/components/games/shared/types";
 function directionFromKey(key: string): Direction | null {
   switch (key) {
@@ -35,7 +35,7 @@ function directionFromKey(key: string): Direction | null {
 }
 export const SnakeCanvas = forwardRef<
   GameCanvasHandle,
-  GameCanvasProps<GameOverResult>
+  GameCanvasProps<SnakeGameOverResult>
 >(function SnakeCanvas(
   { paused, onScoreChange, onLivesChange, onLevelChange, onGameOver },
   ref,

@@ -35,6 +35,11 @@ import {
   addArkanoidScore,
   getArkanoidLeaderboard,
 } from "@/components/games/arkanoid/leaderboard";
+import { SnakeCanvas } from "@/components/games/snake/snake-canvas";
+import {
+  addSnakeScore,
+  getSnakeLeaderboard,
+} from "@/components/games/snake/leaderboard";
 const LIVES = 3;
 const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
   { value: "retro", label: "Retro" },
@@ -191,7 +196,8 @@ export function GamePlayer({ game }: { game: Game }) {
   const isAsteroids = game.id === "asteroids";
   const isTetris = game.id === "tetris";
   const isArkanoid = game.id === "arkanoid";
-  const isPortedGame = isAsteroids || isTetris || isArkanoid;
+  const isSnake = game.id === "snake";
+  const isPortedGame = isAsteroids || isTetris || isArkanoid || isSnake;
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(LIVES);
   const [engineLevel, setEngineLevel] = useState(1);
@@ -205,6 +211,7 @@ export function GamePlayer({ game }: { game: Game }) {
   const [arkanoidResult, setArkanoidResult] = useState<GameOverResult | null>(
     null,
   );
+  const [snakeResult, setSnakeResult] = useState<GameOverResult | null>(null);
   const [leaderboardEntries, setLeaderboardEntries] = useState<
     LeaderboardEntry[]
   >([]);
@@ -251,13 +258,14 @@ export function GamePlayer({ game }: { game: Game }) {
   }, [isPortedGame, over, paused]);
   const restart = () => {
     setScore(0);
-    setLives(isTetris ? 0 : LIVES);
+    setLives(isTetris || isSnake ? 0 : LIVES);
     setEngineLevel(1);
     setPaused(false);
     setOver(false);
     setAsteroidsResult(null);
     setTetrisResult(null);
     setArkanoidResult(null);
+    setSnakeResult(null);
     setLeaderboardEntries([]);
     setLeaderboardLoading(false);
     setLeaderboardFetchError(null);
@@ -309,6 +317,21 @@ export function GamePlayer({ game }: { game: Game }) {
     setOver(true);
     loadArkanoidLeaderboard();
   };
+  const loadSnakeLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardFetchError(null);
+    getSnakeLeaderboard()
+      .then(setLeaderboardEntries)
+      .catch(() =>
+        setLeaderboardFetchError("No se pudieron cargar las puntuaciones."),
+      )
+      .finally(() => setLeaderboardLoading(false));
+  };
+  const handleSnakeGameOver = (result: GameOverResult) => {
+    setSnakeResult(result);
+    setOver(true);
+    loadSnakeLeaderboard();
+  };
   const handleForceEnd = () => {
     if (isAsteroids) {
       setAsteroidsResult({
@@ -326,6 +349,10 @@ export function GamePlayer({ game }: { game: Game }) {
     if (isArkanoid) {
       setArkanoidResult({ score, level: engineLevel });
       loadArkanoidLeaderboard();
+    }
+    if (isSnake) {
+      setSnakeResult({ score, level: engineLevel });
+      loadSnakeLeaderboard();
     }
     setOver(true);
   };
@@ -412,6 +439,15 @@ export function GamePlayer({ game }: { game: Game }) {
               onLevelChange={setEngineLevel}
               onGameOver={handleArkanoidGameOver}
             />
+          ) : isSnake ? (
+            <SnakeCanvas
+              ref={canvasRef}
+              paused={paused || over}
+              onScoreChange={setScore}
+              onLivesChange={setLives}
+              onLevelChange={setEngineLevel}
+              onGameOver={handleSnakeGameOver}
+            />
           ) : (
             <div className="game-arena">
               <div className="grid-floor"></div>
@@ -461,7 +497,9 @@ export function GamePlayer({ game }: { game: Game }) {
                 ? (tetrisResult?.score ?? score)
                 : isArkanoid
                   ? (arkanoidResult?.score ?? score)
-                  : score
+                  : isSnake
+                    ? (snakeResult?.score ?? score)
+                    : score
           }
           level={
             isAsteroids
@@ -470,7 +508,9 @@ export function GamePlayer({ game }: { game: Game }) {
                 ? (tetrisResult?.level ?? engineLevel)
                 : isArkanoid
                   ? (arkanoidResult?.level ?? engineLevel)
-                  : undefined
+                  : isSnake
+                    ? (snakeResult?.level ?? engineLevel)
+                    : undefined
           }
           user={user}
           defaultName={
@@ -526,7 +566,21 @@ export function GamePlayer({ game }: { game: Game }) {
                         setLeaderboardEntries(entries);
                       },
                     }
-                  : undefined
+                  : isSnake
+                    ? {
+                        entries: leaderboardEntries,
+                        loading: leaderboardLoading,
+                        fetchError: leaderboardFetchError,
+                        onSaveName: async (name) => {
+                          const result = snakeResult ?? {
+                            score,
+                            level: engineLevel,
+                          };
+                          const entries = await addSnakeScore(name, result);
+                          setLeaderboardEntries(entries);
+                        },
+                      }
+                    : undefined
           }
           onRestart={restart}
         />
