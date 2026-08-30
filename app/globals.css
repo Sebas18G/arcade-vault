@@ -756,7 +756,7 @@ a {
   content: "";
   position: absolute;
   inset: 0;
-  background-image:
+  background:
     radial-gradient(circle at 70% 50%, var(--magenta) 0 6px, transparent 7px),
     linear-gradient(90deg, var(--green) 0 40px, transparent 40px) 20% 50% /
       200px 12px no-repeat,

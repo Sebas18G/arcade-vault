@@ -163,9 +163,6 @@ export const FRUITS: Record<
 | No hay autenticación en los inserts de puntaje — mismo modelo de confianza que Asteroids/Tetris/Arkanoid.                                                                     | Aceptado, precedente ya documentado en specs 05/06: `check` constraints básicos (`player_name` 1–10, `score >= 0`) bloquean basura obvia, no un puntaje falso "razonable".  |
 | Realtime no entrega eventos si el filtro del canal no usa `schema: "arcade-vault"` o si la policy de `SELECT` no permite al rol `anon` ver las filas.                         | Verificación explícita en el paso 8 del plan: guardar un puntaje en una pestaña del navegador y confirmar que aparece en `/salon` abierto en otra pestaña, sin recargar.    |
 
-## Post-implementation notes
-
-- **Bug encontrado y corregido durante la verificación manual (Paso 9):** la migración inicial de `snake_scores` (Paso 5) creó la tabla, RLS y policies, pero omitió los `GRANT SELECT, INSERT` a los roles `anon`/`authenticated` a nivel de tabla que sí tenían `asteroids_scores`/`tetris_scores`/`arkanoid_scores` desde su migración original de spec 06. Sin ese grant, PostgREST devuelve `401` en cualquier request (tanto lectura del leaderboard como guardado de puntaje), independientemente de que las policies de RLS sean correctas. Se corrigió con una migración adicional (`grant_snake_scores_privileges`) que agrega `grant select, insert on "arcade-vault"."snake_scores" to anon, authenticated;`. Queda como nota para migraciones futuras: replicar también los `GRANT` explícitos, no asumir privilegios por defecto del schema.
 
 ## What is **not** in this spec
 
