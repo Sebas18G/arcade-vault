@@ -9,6 +9,7 @@ import type {
   AsteroidsGameOverResult,
   GameCanvasHandle,
   LeaderboardEntry,
+  TetrisGameOverResult,
 } from "@/components/games/shared/types";
 import { AsteroidsCanvas } from "@/components/games/asteroids/asteroids-canvas";
 import {
@@ -17,6 +18,12 @@ import {
   getSavedPlayerName,
   setSavedPlayerName,
 } from "@/components/games/asteroids/leaderboard";
+import { TetrisCanvas } from "@/components/games/tetris/tetris-canvas";
+import {
+  addTetrisScore,
+  getTetrisLeaderboard,
+  updateTetrisBestStats,
+} from "@/components/games/tetris/leaderboard";
 const LIVES = 3;
 function GameOverModal({
   game,
@@ -122,6 +129,7 @@ function GameOverModal({
 export function GamePlayer({ game }: { game: Game }) {
   const { user } = useAuth();
   const isAsteroids = game.id === "rocas";
+  const isTetris = game.id === "caida";
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(LIVES);
   const [engineLevel, setEngineLevel] = useState(1);
@@ -129,31 +137,42 @@ export function GamePlayer({ game }: { game: Game }) {
   const [over, setOver] = useState(false);
   const [asteroidsResult, setAsteroidsResult] =
     useState<AsteroidsGameOverResult | null>(null);
+  const [tetrisResult, setTetrisResult] = useState<TetrisGameOverResult | null>(
+    null,
+  );
   const [leaderboardEntries, setLeaderboardEntries] = useState<
     LeaderboardEntry[]
   >([]);
   const canvasRef = useRef<GameCanvasHandle>(null);
-  const level = isAsteroids ? engineLevel : Math.floor(score / 2500) + 1;
+  const level =
+    isAsteroids || isTetris ? engineLevel : Math.floor(score / 2500) + 1;
   useEffect(() => {
-    if (isAsteroids) return;
+    if (isAsteroids || isTetris) return;
     if (over || paused) return;
     const t = setInterval(() => {
       setScore((s) => s + Math.floor(10 + Math.random() * 90));
     }, 220);
     return () => clearInterval(t);
-  }, [isAsteroids, over, paused]);
+  }, [isAsteroids, isTetris, over, paused]);
   const restart = () => {
     setScore(0);
-    setLives(LIVES);
+    setLives(isTetris ? 0 : LIVES);
     setEngineLevel(1);
     setPaused(false);
     setOver(false);
     setAsteroidsResult(null);
+    setTetrisResult(null);
     canvasRef.current?.restart();
   };
   const handleAsteroidsGameOver = (result: AsteroidsGameOverResult) => {
     setAsteroidsResult(result);
     setLeaderboardEntries(getAsteroidsLeaderboard());
+    setOver(true);
+  };
+  const handleTetrisGameOver = (result: TetrisGameOverResult) => {
+    setTetrisResult(result);
+    updateTetrisBestStats(result);
+    setLeaderboardEntries(getTetrisLeaderboard());
     setOver(true);
   };
   const handleForceEnd = () => {
@@ -165,6 +184,10 @@ export function GamePlayer({ game }: { game: Game }) {
         bestCombo: 0,
       });
       setLeaderboardEntries(getAsteroidsLeaderboard());
+    }
+    if (isTetris) {
+      setTetrisResult({ score, level: engineLevel, lines: 0, bestCombo: 0 });
+      setLeaderboardEntries(getTetrisLeaderboard());
     }
     setOver(true);
   };
@@ -214,6 +237,15 @@ export function GamePlayer({ game }: { game: Game }) {
               onLevelChange={setEngineLevel}
               onGameOver={handleAsteroidsGameOver}
             />
+          ) : isTetris ? (
+            <TetrisCanvas
+              ref={canvasRef}
+              paused={paused || over}
+              onScoreChange={setScore}
+              onLivesChange={setLives}
+              onLevelChange={setEngineLevel}
+              onGameOver={handleTetrisGameOver}
+            />
           ) : (
             <div className="game-arena">
               <div className="grid-floor"></div>
@@ -256,9 +288,19 @@ export function GamePlayer({ game }: { game: Game }) {
       {over && (
         <GameOverModal
           game={game}
-          score={isAsteroids ? (asteroidsResult?.score ?? score) : score}
+          score={
+            isAsteroids
+              ? (asteroidsResult?.score ?? score)
+              : isTetris
+                ? (tetrisResult?.score ?? score)
+                : score
+          }
           level={
-            isAsteroids ? (asteroidsResult?.level ?? engineLevel) : undefined
+            isAsteroids
+              ? (asteroidsResult?.level ?? engineLevel)
+              : isTetris
+                ? (tetrisResult?.level ?? engineLevel)
+                : undefined
           }
           user={user}
           defaultName={
@@ -281,7 +323,20 @@ export function GamePlayer({ game }: { game: Game }) {
                     setLeaderboardEntries(addAsteroidsScore(name, result));
                   },
                 }
-              : undefined
+              : isTetris
+                ? {
+                    entries: leaderboardEntries,
+                    onSaveName: (name) => {
+                      const result = tetrisResult ?? {
+                        score,
+                        level: engineLevel,
+                        lines: 0,
+                        bestCombo: 0,
+                      };
+                      setLeaderboardEntries(addTetrisScore(name, result));
+                    },
+                  }
+                : undefined
           }
           onRestart={restart}
         />
