@@ -1,6 +1,6 @@
 # SPEC 07 — Mover controles de skin y tema de Tetris al HUD del reproductor
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** SPEC 05 (juegos arcade reales)
 **Fecha:** 2026-08-30
 
