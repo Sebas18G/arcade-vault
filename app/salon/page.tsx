@@ -31,8 +31,7 @@ function mapRows(
 export default function HallOfFamePage() {
   const { user } = useAuth();
   const [games, setGames] = useState<GameRow[]>([]);
-  const [tab, setTab] = useState("GLOBAL");
-  const [globalFilter, setGlobalFilter] = useState("TODOS");
+  const [tab, setTab] = useState("");
   const [rows, setRows] = useState<SalonRow[]>([]);
   const [rowsLoading, setRowsLoading] = useState(true);
   const [youRow, setYouRow] = useState<SalonRow | null>(null);
@@ -43,7 +42,10 @@ export default function HallOfFamePage() {
       .from("games")
       .select("id, title, created_at")
       .then(({ data }) => {
-        if (!cancelled) setGames((data ?? []) as GameRow[]);
+        if (cancelled) return;
+        const list = (data ?? []) as GameRow[];
+        setGames(list);
+        setTab((current) => current || list[0]?.id || "");
       });
     return () => {
       cancelled = true;
@@ -53,29 +55,19 @@ export default function HallOfFamePage() {
     let cancelled = false;
     const supabase = createClient();
     async function load() {
-      setRowsLoading(true);
-      if (tab === "GLOBAL") {
-        let query = supabase
-          .from("global_scores")
-          .select("id, player_name, score, created_at")
-          .order("score", { ascending: false })
-          .limit(20);
-        if (globalFilter !== "TODOS") query = query.eq("game_id", globalFilter);
-        const { data } = await query;
-        if (!cancelled) setRows(mapRows(data));
-      } else {
-        const table = SCORE_TABLE[tab];
-        if (!table) {
-          if (!cancelled) setRows([]);
-          return;
-        }
-        const { data } = await supabase
-          .from(table)
-          .select("id, player_name, score, created_at")
-          .order("score", { ascending: false })
-          .limit(12);
-        if (!cancelled) setRows(mapRows(data));
+      const table = SCORE_TABLE[tab];
+      if (!table) {
+        setRows([]);
+        setRowsLoading(false);
+        return;
       }
+      setRowsLoading(true);
+      const { data } = await supabase
+        .from(table)
+        .select("id, player_name, score, created_at")
+        .order("score", { ascending: false })
+        .limit(12);
+      if (!cancelled) setRows(mapRows(data));
     }
     load().finally(() => {
       if (!cancelled) setRowsLoading(false);
@@ -83,49 +75,38 @@ export default function HallOfFamePage() {
     return () => {
       cancelled = true;
     };
-  }, [tab, globalFilter]);
+  }, [tab]);
   useEffect(() => {
-    if (!user) return;
     let cancelled = false;
     const supabase = createClient();
     async function load() {
-      if (!user) return;
-      const table = tab === "GLOBAL" ? "global_scores" : SCORE_TABLE[tab];
-      if (!table) return;
-      let query = supabase
+      const table = SCORE_TABLE[tab];
+      if (!user || !table) {
+        setYouRow(null);
+        return;
+      }
+      const { data } = await supabase
         .from(table)
         .select("id, player_name, score, created_at")
         .eq("player_name", user.name)
         .order("score", { ascending: false })
         .limit(1);
-      if (tab === "GLOBAL" && globalFilter !== "TODOS") {
-        query = query.eq("game_id", globalFilter);
-      }
-      const { data } = await query;
       if (!cancelled) setYouRow(mapRows(data)[0] ?? null);
     }
     load();
     return () => {
       cancelled = true;
     };
-  }, [tab, globalFilter, user]);
+  }, [tab, user]);
   useEffect(() => {
-    const table = tab === "GLOBAL" ? "global_scores" : SCORE_TABLE[tab];
+    const table = SCORE_TABLE[tab];
     if (!table) return;
-    const limit = tab === "GLOBAL" ? 20 : 12;
     const supabase = createClient();
     const channel = supabase
-      .channel(`salon-${table}-${tab}-${globalFilter}`)
+      .channel(`salon-${table}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "arcade-vault",
-          table,
-          ...(tab === "GLOBAL" && globalFilter !== "TODOS"
-            ? { filter: `game_id=eq.${globalFilter}` }
-            : {}),
-        },
+        { event: "INSERT", schema: "arcade-vault", table },
         (payload) => {
           const row = payload.new as {
             id: string;
@@ -137,7 +118,7 @@ export default function HallOfFamePage() {
             if (prev.some((r) => r.id === row.id)) return prev;
             const next = [...prev, mapRows([row])[0]];
             next.sort((a, b) => b.score - a.score);
-            return next.slice(0, limit);
+            return next.slice(0, 12);
           });
         },
       )
@@ -145,16 +126,14 @@ export default function HallOfFamePage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [tab, globalFilter]);
+  }, [tab]);
   const activeGame = games.find((g) => g.id === tab);
   const visibleYouRow = user ? youRow : null;
   const youRankInList = visibleYouRow
     ? rows.findIndex((r) => r.id === visibleYouRow.id)
     : -1;
   const youRankLabel =
-    youRankInList >= 0
-      ? String(youRankInList + 1).padStart(2, "0")
-      : `>${tab === "GLOBAL" ? 20 : 12}`;
+    youRankInList >= 0 ? String(youRankInList + 1).padStart(2, "0") : ">12";
   return (
     <div className="av-hall fade-in">
       <div className="hall-head">
@@ -173,30 +152,7 @@ export default function HallOfFamePage() {
             {g.title}
           </button>
         ))}
-        <button
-          className={"chip" + (tab === "GLOBAL" ? " active" : "")}
-          onClick={() => setTab("GLOBAL")}
-        >
-          GLOBAL
-        </button>
       </div>
-      {tab === "GLOBAL" && (
-        <div className="hall-tabs" style={{ marginTop: 10 }}>
-          {["TODOS", ...games.map((g) => g.id)].map((id) => {
-            const label =
-              id === "TODOS" ? "TODOS" : games.find((g) => g.id === id)?.title;
-            return (
-              <button
-                key={id}
-                className={"chip" + (globalFilter === id ? " active" : "")}
-                onClick={() => setGlobalFilter(id)}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      )}
       {!rowsLoading && rows.length > 0 && (
         <div className="podium">
           {rows[1] && (
@@ -292,10 +248,7 @@ export default function HallOfFamePage() {
         {visibleYouRow && (
           <>
             <div className="tr you-label">
-              ▸{" "}
-              {tab === "GLOBAL"
-                ? "TU MEJOR MARCA"
-                : `TU MEJOR MARCA EN ${activeGame?.title ?? tab}`}
+              ▸ TU MEJOR MARCA EN {activeGame?.title ?? tab}
             </div>
             <div
               className="tr you"
