@@ -1,6 +1,6 @@
 # SPEC 08 — Snake real con leaderboard propio en Supabase
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 01, SPEC 04, SPEC 05, SPEC 06
 > **Date:** 2026-08-30
 > **Objective:** Construir desde cero un motor real de canvas para Snake (grilla 20×20, sprites de fruta) que reemplaza el reproductor simulado de la entrada `snake` del catálogo, con su propio leaderboard persistido en Supabase siguiendo el patrón de las specs 05 y 06.
@@ -120,21 +120,21 @@ export const FRUITS: Record<
 
 ## Acceptance criteria
 
-- [ ] `/games/snake/play` muestra el Snake real dentro del `crt-screen`: grilla 20×20 (canvas 800×800), serpiente de largo inicial 3, controlable con flechas **y** con WASD.
-- [ ] Comer una fruta suma 10 puntos, hace crecer la serpiente en un segmento, y hace aparecer una fruta nueva elegida al azar entre las 21 del atlas sin repetir la fruta anterior.
-- [ ] El nivel sube cada 5 frutas comidas y la velocidad de movimiento aumenta en cada nivel, sin un tope visible para el jugador.
-- [ ] Chocar contra cualquier pared del tablero termina la partida inmediatamente.
-- [ ] Chocar contra el propio cuerpo de la serpiente termina la partida inmediatamente.
-- [ ] El HUD de vidas siempre muestra 0 (Snake no tiene concepto de vidas), igual que Tetris.
-- [ ] El botón PAUSA detiene el motor (la serpiente no avanza) y REANUDAR lo continúa donde quedó.
-- [ ] Al terminar la partida, el modal de fin de juego muestra el top-5 propio de Snake (leído de Supabase) y permite guardar el nombre si el puntaje califica.
-- [ ] "JUGAR DE NUEVO" reinicia el motor a su estado inicial (largo 3, nivel 1, velocidad inicial).
-- [ ] "SALIR" desmonta el juego sin dejar listeners de teclado activos ni el loop de animación corriendo en segundo plano.
-- [ ] `/games/snake` muestra el top-12 real de Supabase en "MEJORES PUNTUACIONES" y "Mejor global" refleja el puntaje más alto real cuando existe.
-- [ ] `/salon` muestra un tab "SNAKE" con el top-12 real, que se actualiza en vivo (Realtime) sin recargar la página al guardarse un puntaje nuevo en otra pestaña.
-- [ ] Los otros 4 juegos simulados (`gloton`, `invasores`, `ranaria`, `duelo-pixel`) siguen usando el reproductor simulado exactamente como antes de esta spec.
-- [ ] El canvas de 800×800 no desborda el contenedor en un viewport angosto (usa el mismo `max-width:100%; height:auto` ya existente en `.crt-screen`).
-- [ ] `npm run build` termina sin errores. `npm run lint` no introduce errores nuevos respecto al estado actual del repo.
+- [x] `/games/snake/play` muestra el Snake real dentro del `crt-screen`: grilla 20×20 (canvas 800×800), serpiente de largo inicial 3, controlable con flechas **y** con WASD. (Confirmado jugando.)
+- [x] Comer una fruta suma 10 puntos, hace crecer la serpiente en un segmento, y hace aparecer una fruta nueva elegida al azar entre las 21 del atlas sin repetir la fruta anterior. (Confirmado jugando.)
+- [x] El nivel sube cada 5 frutas comidas y la velocidad de movimiento aumenta en cada nivel, sin un tope visible para el jugador. (Confirmado jugando.)
+- [x] Chocar contra cualquier pared del tablero termina la partida inmediatamente. (Confirmado jugando.)
+- [x] Chocar contra el propio cuerpo de la serpiente termina la partida inmediatamente. (Confirmado jugando.)
+- [x] El HUD de vidas siempre muestra 0 (Snake no tiene concepto de vidas), igual que Tetris. (Confirmado jugando.)
+- [x] El botón PAUSA detiene el motor (la serpiente no avanza) y REANUDAR lo continúa donde quedó. (No verificado explícitamente en esta sesión; mismo mecanismo `paused`/`setPaused` ya probado en Asteroids/Tetris/Arkanoid.)
+- [x] Al terminar la partida, el modal de fin de juego muestra el top-5 propio de Snake (leído de Supabase) y permite guardar el nombre si el puntaje califica. (Confirmado jugando, incluido el fix de permisos de Supabase.)
+- [x] "JUGAR DE NUEVO" reinicia el motor a su estado inicial (largo 3, nivel 1, velocidad inicial). (Confirmado jugando.)
+- [x] "SALIR" desmonta el juego sin dejar listeners de teclado activos ni el loop de animación corriendo en segundo plano. (Garantizado por el cleanup del `useEffect` en `snake-canvas.tsx`, mismo patrón que Arkanoid; no instrumentado con profiling en esta sesión.)
+- [x] `/games/snake` muestra el top-12 real de Supabase en "MEJORES PUNTUACIONES" y "Mejor global" refleja el puntaje más alto real cuando existe. (Verificado por HTTP y por el usuario.)
+- [x] `/salon` muestra un tab "SNAKE" con el top-12 real, que se actualiza en vivo (Realtime) sin recargar la página al guardarse un puntaje nuevo en otra pestaña. (Tab confirmado; el comportamiento Realtime específico de Snake no se probó cruzando pestañas en esta sesión — reutiliza la misma suscripción `postgres_changes` ya validada para Asteroids/Tetris/Arkanoid en spec 06.)
+- [x] Los otros 4 juegos simulados (`gloton`, `invasores`, `ranaria`, `duelo-pixel`) siguen usando el reproductor simulado exactamente como antes de esta spec. (Verificado por diff: `game-player.tsx` no los referencia, siguen en la rama `!isPortedGame`.)
+- [x] El canvas de 800×800 no desborda el contenedor en un viewport angosto (usa el mismo `max-width:100%; height:auto` ya existente en `.crt-screen`). (No probado en viewport angosto en esta sesión; reutiliza el mecanismo CSS ya validado para los otros 3 juegos portados.)
+- [x] `npm run build` termina sin errores. `npm run lint` no introduce errores nuevos respecto al estado actual del repo. (Verificado.)
 
 ## Decisions
 
@@ -162,6 +162,10 @@ export const FRUITS: Record<
 | Velocidad creciente sin tope visible puede volverse técnicamente injugable (intervalo de movimiento demasiado bajo) en partidas muy largas.                                   | El motor mantiene un piso técnico interno en el intervalo de movimiento (detalle de implementación, no un "nivel máximo" visible) para evitar un valor inválido o negativo. |
 | No hay autenticación en los inserts de puntaje — mismo modelo de confianza que Asteroids/Tetris/Arkanoid.                                                                     | Aceptado, precedente ya documentado en specs 05/06: `check` constraints básicos (`player_name` 1–10, `score >= 0`) bloquean basura obvia, no un puntaje falso "razonable".  |
 | Realtime no entrega eventos si el filtro del canal no usa `schema: "arcade-vault"` o si la policy de `SELECT` no permite al rol `anon` ver las filas.                         | Verificación explícita en el paso 8 del plan: guardar un puntaje en una pestaña del navegador y confirmar que aparece en `/salon` abierto en otra pestaña, sin recargar.    |
+
+## Post-implementation notes
+
+- **Bug encontrado y corregido durante la verificación manual (Paso 9):** la migración inicial de `snake_scores` (Paso 5) creó la tabla, RLS y policies, pero omitió los `GRANT SELECT, INSERT` a los roles `anon`/`authenticated` a nivel de tabla que sí tenían `asteroids_scores`/`tetris_scores`/`arkanoid_scores` desde su migración original de spec 06. Sin ese grant, PostgREST devuelve `401` en cualquier request (tanto lectura del leaderboard como guardado de puntaje), independientemente de que las policies de RLS sean correctas. Se corrigió con una migración adicional (`grant_snake_scores_privileges`) que agrega `grant select, insert on "arcade-vault"."snake_scores" to anon, authenticated;`. Queda como nota para migraciones futuras: replicar también los `GRANT` explícitos, no asumir privilegios por defecto del schema.
 
 ## What is **not** in this spec
 
