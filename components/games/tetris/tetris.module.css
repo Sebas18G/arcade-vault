@@ -1,0 +1,306 @@
+.container {
+  --bg: #0f0f17;
+  --text: #e0e0e0;
+  --board-border: #2a2a3a;
+  --board-bg: #1a1a25;
+  --grid-color: #22222e;
+  --panel-label: #555570;
+  --panel-value: #7aa2f7;
+  --kbd-bg: #22223a;
+  --kbd-border: #3a3a5a;
+  --switch-track: #3a3a5a;
+  --switch-thumb: #e0e0e0;
+  --btn-bg: #7aa2f7;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Courier New", Courier, monospace;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.container.light {
+  --bg: #f0f0f5;
+  --text: #24243a;
+  --board-border: #c4c4d4;
+  --board-bg: #ffffff;
+  --grid-color: #d8d8e4;
+  --panel-label: #7a7a95;
+  --panel-value: #3b5bdb;
+  --kbd-bg: #e4e4ee;
+  --kbd-border: #c4c4d4;
+  --switch-track: #c4c4d4;
+  --switch-thumb: #ffffff;
+  --btn-bg: #3b5bdb;
+}
+
+.topControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 460px;
+}
+
+.skinToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skinToggle label {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--panel-label);
+  font-weight: 600;
+}
+
+.skinToggle select {
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.themeToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.themeToggle .icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch .slider {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: var(--switch-track);
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+
+.switch .slider::before {
+  content: "";
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: var(--switch-thumb);
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.switch input:checked + .slider {
+  background: var(--btn-bg);
+}
+
+.switch input:checked + .slider::before {
+  transform: translateX(16px);
+}
+
+.gameRow {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.boardWrap {
+  position: relative;
+}
+
+.board {
+  display: block;
+  border: 1px solid var(--board-border);
+  background: var(--board-bg);
+  border-radius: 4px;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+}
+
+.powerupToast {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  padding: 10px 20px;
+  background: rgba(10, 10, 20, 0.8);
+  border: 1px solid var(--board-border);
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #fff;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+
+.powerupToast.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.comboToast {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  padding: 8px 18px;
+  background: rgba(10, 10, 20, 0.82);
+  border: 1px solid var(--board-border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #ffd54f;
+  text-shadow: 0 0 8px rgba(255, 213, 79, 0.6);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+  z-index: 2;
+}
+
+.comboToast.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  animation: comboPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes comboPop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  60% {
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes boardFlash {
+  0% {
+    box-shadow:
+      0 0 40px rgba(0, 0, 0, 0.6),
+      0 0 0 rgba(0, 0, 0, 0);
+  }
+  30% {
+    box-shadow:
+      0 0 40px rgba(0, 0, 0, 0.6),
+      0 0 30px 6px var(--flash-color);
+  }
+  100% {
+    box-shadow:
+      0 0 40px rgba(0, 0, 0, 0.6),
+      0 0 0 rgba(0, 0, 0, 0);
+  }
+}
+
+.board.flashNormal {
+  --flash-color: rgba(122, 162, 247, 0.8);
+  animation: boardFlash 0.5s ease;
+}
+.board.flashTspin {
+  --flash-color: rgba(186, 104, 200, 0.9);
+  animation: boardFlash 0.5s ease;
+}
+.board.flashTetris {
+  --flash-color: rgba(77, 208, 225, 0.9);
+  animation: boardFlash 0.5s ease;
+}
+.board.flashB2b {
+  --flash-color: rgba(255, 183, 77, 0.9);
+  animation: boardFlash 0.5s ease;
+}
+.board.flashPerfect {
+  --flash-color: rgba(255, 215, 0, 0.95);
+  animation: boardFlash 0.6s ease;
+}
+
+.panel {
+  width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.panelSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--panel-label);
+  font-weight: 600;
+}
+
+.value {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--panel-value);
+  letter-spacing: 1px;
+}
+
+.comboValue {
+  color: #ffd54f !important;
+  animation: comboValuePulse 0.3s ease;
+}
+
+@keyframes comboValuePulse {
+  0% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.nextCanvas {
+  display: block;
+  border: 1px solid var(--board-border);
+  background: var(--board-bg);
+  border-radius: 4px;
+}
+
+.nextLabel {
+  font-size: 11px;
+  letter-spacing: 0;
+}
