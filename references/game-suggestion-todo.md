@@ -26,9 +26,9 @@ Es legible y editable a mano: si quieres vetar un juego o cambiar un estado, edi
 | TETRIS      | `tetris`      | Implementado      | —      | 2026-08-30 |
 | SNAKE       | `snake`       | Implementado      | —      | 2026-08-30 |
 | ASTEROIDS   | `asteroids`   | Implementado      | —      | 2026-08-30 |
+| FROGGER     | `frogger`     | Aceptado          | 9/10   | 2026-08-30 |
 | INVASORES   | `invasores`   | Sugerido          | 9/10   | 2026-08-30 |
 | 2048        | `2048`        | Candidato natural | 9/10   | 2026-08-30 |
-| RANARIA     | `ranaria`     | Candidato natural | 8/10   | 2026-08-30 |
 | CIEMPIÉS    | `ciempies`    | Candidato natural | 8/10   | 2026-08-30 |
 | MISILES     | `misiles`     | Candidato natural | 8/10   | 2026-08-30 |
 | GLOTÓN      | `gloton`      | Candidato natural | 7/10   | 2026-08-30 |
@@ -47,6 +47,8 @@ Es legible y editable a mano: si quieres vetar un juego o cambiar un estado, edi
 | BARRILES    | `barriles`    | Candidato natural | 5/10   | 2026-08-30 |
 | DUELO PIXEL | `duelo-pixel` | Descartado        | 4/10   | 2026-08-30 |
 
+> **Ronda 2 — game jam (2026-08-30):** corrida del skill `/game-jam` con el tema **"cruza la carretera y el río sin convertirte en papilla"**. La jam agrega a la Fase 2 un criterio propio, **fuerza temática (0–10)**, y elige un solo juego. Se evaluaron `ranaria`/Frogger (10/10 temático), `rio-letal` (río, pero shooter con scroll: 4/10), `excavador` (3/10) y `kaboom` (2/10). Ganó Frogger por goleada y quedó **Aceptado**, con sus tres specs escritas en `specs/games-jam/` (09, 10 y 11). Ningún otro estado cambió en esta ronda.
+>
 > **Ronda 1 (2026-08-30):** se evaluaron 20 candidatos a pedido explícito del humano (anula el límite de 3–5 por ronda de la Fase 3 del agente). Se verificaron con fuentes las mecánicas y la puntuación del top: `invasores`, `2048`, `ranaria`, `ciempies`, `misiles`, `gloton`, `galaxia` (parcial) y `duelo-pixel`. Las fichas marcadas **"Estimación no verificada"** se puntuaron por conocimiento general del arcade sin confirmar con fuente; antes de aceptar cualquiera de ellas hay que verificar su puntuación y sus controles.
 
 ---
@@ -95,14 +97,18 @@ Es legible y editable a mano: si quieres vetar un juego o cambiar un estado, edi
 **Mecánica confirmada:** 5 filas × 11 columnas = 55 invasores. Fila superior 30 pts, dos filas medias 20 pts, dos filas inferiores 10 pts → 990 pts por pantalla limpia. El UFO **no** vale un valor aleatorio: recorre la secuencia fija `(50,50,100,150,100,100,50,300,100,100,100,50,150,100,100)` indexada por el número de disparos del jugador. La formación acelera a medida que quedan menos invasores. Al limpiar la pantalla, la oleada siguiente empieza más abajo, en bucle infinito. 4 búnkeres destructibles por pantalla, erosionados por disparos de ambos bandos y arrasados si un invasor los atraviesa.
 **Pendiente de confirmar:** cadencia de disparo del jugador en el original (¿un solo proyectil en pantalla a la vez?); frecuencia y algoritmo de disparo de los invasores; velocidad exacta por invasor restante; cuántas filas baja cada oleada nueva y si hay tope; si hay vida extra por puntaje.
 
-### RANARIA (`ranaria`)
+### FROGGER (`frogger`, antes `ranaria`)
 
-**Estado:** Candidato natural · **Encaje:** 8/10 · **Fecha:** 2026-08-30 · **Tipo:** upgrade de simulado
-**Situación:** entrada de catálogo con reproductor simulado. Sin motor real ni tabla propia.
-**Evaluado el 2026-08-30 (ronda 1):** viable y de tamaño razonable — segundo lugar de la ronda, por detrás de `invasores`. Lo que lo baja: satura la categoría ARCADE (ya tiene `arkanoid` y `snake` con motor real, más `gloton` como candidato), y su capa de río exige lógica de "la rana viaja montada en el tronco" que no tiene precedente en el repo. **No descartado:** es el candidato directo de la ronda 2.
-**Brief parcial:** cat ARCADE (existe) · color green · cover `cover-rana` · teclado (flechas, salto discreto celda a celda) · 3/5/7 vidas según ajuste original (proponer 3, alineado con el resto del catálogo) · niveles sí · leaderboard: score, level, `frogs_home`, `time_bonus` · copy actual: "Cruza la autopista de pixeles."
+**Estado:** Aceptado · **Encaje:** 9/10 · **Fecha:** 2026-08-30 · **Tipo:** upgrade de simulado
+**Situación:** entrada de catálogo con reproductor simulado. Sin motor real ni tabla propia todavía; sus tres specs ya están escritas y en estado `Draft`.
+**Aceptado el 2026-08-30 (ronda 2, game jam):** elegido por el skill `/game-jam` para el tema **"cruza la carretera y el río sin convertirte en papilla"**, que describe literalmente su bucle de juego. Su encaje sube de 8/10 a 9/10 al sumarse el criterio de **fuerza temática (10/10)** que la jam agrega a la Fase 2. La objeción de la ronda 1 (satura ARCADE) queda anulada por el tema recibido: el humano pidió este juego, no un hueco de catálogo.
+**Specs:** `specs/games-jam/09-frogger-motor.md` (motor) · `specs/games-jam/10-frogger-leaderboard.md` (tabla `frogger_scores`) · `specs/games-jam/11-frogger-anatomia-de-la-papilla.md` (capa temática: causas de muerte persistidas + selectores de skin y tema en el HUD).
+**Renombrado:** la ficha de `app/data/games.ts` pasa de `ranaria`/`RANARIA` a `frogger`/`FROGGER`, mismo patrón que las specs 06 y 08. El resto de sus campos no se toca.
+**Evaluado el 2026-08-30 (ronda 1):** viable y de tamaño razonable — segundo lugar de la ronda, por detrás de `invasores`. Lo que lo bajaba: satura la categoría ARCADE (ya tiene `arkanoid` y `snake` con motor real, más `gloton` como candidato), y su capa de río exige lógica de "la rana viaja montada en el tronco" que no tiene precedente en el repo.
+**Brief:** cat ARCADE (existe) · color green · cover `cover-rana` · canvas 800×650, grilla 16×13 de 50px · teclado (flechas **y** WASD, salto discreto celda a celda) · 3 vidas · temporizador de 30 s por rana · niveles sí (tableros de 5 casas) · leaderboard: score, level, `frogs_home`, `time_bonus`, más `road_deaths`/`river_deaths`/`timeouts` desde la spec 11 · copy actual: "Cruza la autopista de pixeles."
 **Puntuación confirmada:** 10 pts por cada salto hacia adelante · 50 pts por rana en casa · 10 pts por cada medio segundo sin usar del temporizador · 200 pts por la rana rosa o por comerse la mosca · 1000 pts al meter las 5 ranas y cerrar el nivel · rana extra a los 20 000 · temporizador de 30 s por rana, se reinicia al llegar a casa o al perder una vida · el marcador del arcade original satura a 99 990 (guarda 5 dígitos).
-**Pendiente de confirmar:** número y velocidad de carriles de coches y de troncos/tortugas por nivel; comportamiento de las tortugas que se sumergen; cómo escala la dificultad tras el nivel 5 (las fuentes dicen que se ablanda brevemente y vuelve a subir, sin dar números).
+**Confirmado en la ronda 2 (jam):** layout de 5 carriles de tráfico bidireccional, mediana, 5 carriles de río (troncos hacia la derecha, tortugas hacia la izquierda, algunas se sumergen) y 5 casas arriba. Formas de morir: vehículo, caer al agua, tortuga sumergida, ser arrastrado fuera de pantalla sobre una plataforma, casa ocupada o matorral, temporizador agotado. Vidas configurables por el operador entre 3, 5 y 7.
+**Pendiente de confirmar:** número y velocidad de carriles de coches y de troncos/tortugas por nivel; cadencia exacta de inmersión de las tortugas; frecuencia de aparición de la rana rosa y de la mosca; si el original re-otorga los 10 pts al reavanzar una fila ya visitada en la misma vida; cómo escala la dificultad tras el nivel 5 (las fuentes dicen que se ablanda brevemente y vuelve a subir, sin dar números).
 
 ### DUELO PIXEL (`duelo-pixel`)
 
