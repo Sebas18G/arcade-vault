@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 El proyecto se desarrolla con **Spec Driven Design**, usando los comandos `/spec` y `/spec-impl` provistos por los skills de https://github.com/Klerith/fernando-skills (instalados vía `npx skills@latest add Klerith/fernando-skills`). El flujo esperado es: escribir/actualizar una spec, luego implementarla con `/spec-impl`, en lugar de codear features directamente sin pasar por ese proceso.
 
+Para **agregar un juego nuevo al catálogo** el flujo tiene un paso previo: el agente `game-planner` decide _qué_ juego encaja (ver "Agentes" más abajo), el skill `/add-game <id>` convierte esa decisión en una spec, y `/spec-impl NN-slug` la implementa.
+
 ## Estado actual del código
 
 `app/` implementa Arcade Vault siguiendo las specs aprobadas hasta ahora (`specs/01` a `specs/07`, todas en estado Implementado), traducido desde el mockup de referencia a Next.js/React 19 idiomático:
@@ -28,6 +30,8 @@ El proyecto se desarrolla con **Spec Driven Design**, usando los comandos `/spec
 
 Persistencia en Supabase (spec 06): 5 tablas en el schema `arcade-vault` — `games` (catálogo mínimo id/title, solo para los 3 juegos reales), `asteroids_scores`/`tetris_scores`/`arkanoid_scores` (una por juego, historial completo de partidas) y `global_scores` (poblada automáticamente por trigger `AFTER INSERT` en cada tabla de juego, no consultada actualmente por ningún componente pero disponible para un futuro resumen cross-juego). RLS habilitado: `SELECT` público en las 5; `INSERT` público solo en las 3 tablas de juego (con `check` de `player_name` 1–10 caracteres y `score >= 0`); `user_id` nullable, siempre `null` (no hay auth real todavía). Auth real, migrar los puntajes viejos de `localStorage`, validación anti-cheat de puntajes y persistencia para los 5 juegos simulados todavía no están implementados; son candidatos para futuras specs.
 
+`references/game-suggestion-todo.md` es la **bitácora de juegos candidatos**: la memoria persistente del agente `game-planner` (tabla índice + una ficha por juego, con estados `Candidato natural` / `Sugerido` / `Aceptado` / `Descartado` / `Implementado`). El agente la lee antes de evaluar y la actualiza al terminar, para no volver a proponer lo ya descartado. Es editable a mano: cambiar el estado de una ficha ahí veta o rehabilita ese juego en la siguiente corrida.
+
 `references/templates/` contiene el **mockup/diseño de referencia** original de la app: un prototipo standalone en HTML + React 18 (vía CDN, con Babel standalone, sin build step) que define la UI, las pantallas y los datos de ejemplo. Se mantiene como fuente de verdad histórica para diseño visual y copy en Español al escribir nuevas specs:
 
 - `Arcade Vault.html` — shell HTML que carga React/ReactDOM/Babel desde `unpkg` y cada `.jsx` como script `type="text/babel"`.
@@ -44,6 +48,10 @@ Persistencia en Supabase (spec 06): 5 tablas en el schema `arcade-vault` — `ga
 Al implementar nuevas features en `app/`, seguir usando `references/templates/` como fuente de verdad para diseño visual, copy en Español, nombres de pantallas/rutas y forma de los datos — pero traduciendo la arquitectura a componentes de Next.js/React 19 idiomáticos (no copiar el enrutamiento por hash ni los scripts Babel-en-navegador tal cual).
 
 ## Skills Usa /frontend-design para diseñar interfaces de usuario.
+
+## Agentes
+
+- **`game-planner`** (`.claude/agents/game-planner.md`) — decide **qué** minijuego agregar al catálogo, evaluándolo contra los criterios de encaje de la plataforma, y devuelve un brief técnico. No escribe código ni specs. Su memoria persistente es `references/game-suggestion-todo.md`, donde registra lo sugerido, aceptado y descartado para no repetirse entre sesiones. Cadena completa: `game-planner` (qué juego) → `/add-game <id>` (genera la spec) → `/spec-impl NN-slug` (la implementa).
 
 ## Comandos
 
