@@ -52,6 +52,7 @@ Al implementar nuevas features en `app/`, seguir usando `references/templates/` 
 ## Agentes
 
 - **`game-planner`** (`.claude/agents/game-planner.md`) — decide **qué** minijuego agregar al catálogo, evaluándolo contra los criterios de encaje de la plataforma, y devuelve un brief técnico. No escribe código ni specs. Su memoria persistente es `references/game-suggestion-todo.md`, donde registra lo sugerido, aceptado y descartado para no repetirse entre sesiones. Cadena completa: `game-planner` (qué juego) → `/add-game <id>` (genera la spec) → `/spec-impl NN-slug` (la implementa).
+- **`skin-designer`** (`.claude/agents/skin-designer.md`) — audita que cada juego con motor real tenga las 3 skins obligatorias (`classic` por defecto, `retro` y `neon`), legibles sobre el fondo oscuro de la app, y **las implementa** en **un** juego por corrida. Alcance cerrado: los juegos marcados `Implementado` en `references/game-suggestion-todo.md`. Tetris queda exento (su `retro` hace de clásico y ya tiene `neon`). Su memoria persistente es `references/skin-status.md`. Es una excepción consciente al flujo Spec Driven Design: edita código directamente, sin pasar por `/spec`.
 
 ## Comandos
 
