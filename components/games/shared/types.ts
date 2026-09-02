@@ -21,7 +21,7 @@ export type LeaderboardEntry = {
 };
 export type GameCanvasProps<TResult extends GameOverResult = GameOverResult> = {
   paused: boolean;
-  /** Opcional: los canvas todavía sin skins (arkanoid, snake) lo ignoran. */
+  /** Opcional: los canvas todavía sin skins (arkanoid) lo ignoran. */
   skin?: GameSkin;
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;

@@ -42,6 +42,8 @@ import { SnakeCanvas } from "@/components/games/snake/snake-canvas";
 import {
   addSnakeScore,
   getSnakeLeaderboard,
+  getSnakeSkin,
+  setSnakeSkin,
 } from "@/components/games/snake/leaderboard";
 const LIVES = 3;
 const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
@@ -54,10 +56,11 @@ type SkinOption = { value: string; label: string };
 // Registro de skins por juego: el botón "SKIN" del HUD se renderiza para
 // cualquier juego presente aquí. Tetris conserva sus 4 skins propias; los
 // juegos migrados al contrato compartido usan las 3 de GAME_SKINS.
-// (arkanoid y snake todavía no tienen skins: por eso no figuran).
+// (arkanoid todavía no tiene skins: por eso no figura).
 const SKINS_BY_GAME: Record<string, SkinOption[]> = {
   tetris: TETRIS_SKINS,
   asteroids: GAME_SKINS,
+  snake: GAME_SKINS,
 };
 // Lectura/escritura de la preferencia, delegada al leaderboard.ts de cada juego.
 // Ambas claves son "<gameId>-skin" ("tetris-skin" es la que Tetris ya usaba,
@@ -73,6 +76,10 @@ const SKIN_STORAGE: Record<
   asteroids: {
     read: getAsteroidsSkin,
     write: (value) => setAsteroidsSkin(value as GameSkin),
+  },
+  snake: {
+    read: getSnakeSkin,
+    write: (value) => setSnakeSkin(value as GameSkin),
   },
 };
 function GameOverModal({
@@ -478,6 +485,7 @@ export function GamePlayer({ game }: { game: Game }) {
             <SnakeCanvas
               ref={canvasRef}
               paused={paused || over}
+              skin={skin as GameSkin}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
