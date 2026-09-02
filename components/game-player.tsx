@@ -12,11 +12,14 @@ import type {
   LeaderboardEntry,
   TetrisGameOverResult,
 } from "@/components/games/shared/types";
+import { GAME_SKINS, type GameSkin } from "@/components/games/shared/skins";
 import { AsteroidsCanvas } from "@/components/games/asteroids/asteroids-canvas";
 import {
   addAsteroidsScore,
   getAsteroidsLeaderboard,
+  getAsteroidsSkin,
   getSavedPlayerName,
+  setAsteroidsSkin,
   setSavedPlayerName,
 } from "@/components/games/asteroids/leaderboard";
 import { TetrisCanvas } from "@/components/games/tetris/tetris-canvas";
@@ -47,6 +50,31 @@ const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
   { value: "pastel", label: "Pastel" },
   { value: "pixel", label: "Pixel Art" },
 ];
+type SkinOption = { value: string; label: string };
+// Registro de skins por juego: el botón "SKIN" del HUD se renderiza para
+// cualquier juego presente aquí. Tetris conserva sus 4 skins propias; los
+// juegos migrados al contrato compartido usan las 3 de GAME_SKINS.
+// (arkanoid y snake todavía no tienen skins: por eso no figuran).
+const SKINS_BY_GAME: Record<string, SkinOption[]> = {
+  tetris: TETRIS_SKINS,
+  asteroids: GAME_SKINS,
+};
+// Lectura/escritura de la preferencia, delegada al leaderboard.ts de cada juego.
+// Ambas claves son "<gameId>-skin" ("tetris-skin" es la que Tetris ya usaba,
+// así que la preferencia guardada de sus jugadores sobrevive intacta).
+const SKIN_STORAGE: Record<
+  string,
+  { read: () => string; write: (value: string) => void }
+> = {
+  tetris: {
+    read: getTetrisSkin,
+    write: (value) => setTetrisSkin(value as TetrisSkin),
+  },
+  asteroids: {
+    read: getAsteroidsSkin,
+    write: (value) => setAsteroidsSkin(value as GameSkin),
+  },
+};
 function GameOverModal({
   game,
   score,
@@ -222,22 +250,26 @@ export function GamePlayer({ game }: { game: Game }) {
   // Arrancan en el default "seguro para SSR" (el servidor no tiene localStorage)
   // y se corrigen en un useEffect post-hidratación para no producir un
   // hydration mismatch cuando el usuario ya tenía guardada otra preferencia.
-  const [tetrisSkin, setTetrisSkinState] = useState<TetrisSkin>("retro");
+  const skinOptions = SKINS_BY_GAME[game.id];
+  const [skin, setSkinState] = useState<string>(
+    () => skinOptions?.[0]?.value ?? "classic",
+  );
   const [tetrisTheme, setTetrisThemeState] = useState<"dark" | "light">("dark");
   const canvasRef = useRef<GameCanvasHandle>(null);
   const level = isPortedGame ? engineLevel : Math.floor(score / 2500) + 1;
   useEffect(() => {
-    if (!isTetris) return;
+    const storage = SKIN_STORAGE[game.id];
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTetrisSkinState(getTetrisSkin());
-    setTetrisThemeState(getTetrisTheme());
+    if (storage) setSkinState(storage.read());
+    if (isTetris) setTetrisThemeState(getTetrisTheme());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const cycleTetrisSkin = () => {
-    setTetrisSkinState((prev) => {
-      const idx = TETRIS_SKINS.findIndex((s) => s.value === prev);
-      const next = TETRIS_SKINS[(idx + 1) % TETRIS_SKINS.length].value;
-      setTetrisSkin(next);
+  const cycleSkin = () => {
+    if (!skinOptions) return;
+    setSkinState((prev) => {
+      const idx = skinOptions.findIndex((s) => s.value === prev);
+      const next = skinOptions[(idx + 1) % skinOptions.length].value;
+      SKIN_STORAGE[game.id]?.write(next);
       return next;
     });
   };
@@ -378,22 +410,24 @@ export function GamePlayer({ game }: { game: Game }) {
             <div className="l">Nivel</div>
             <div className="v">{String(level).padStart(2, "0")}</div>
           </div>
+          {skinOptions && (
+            <div className="hud-stat">
+              <div className="l">Skin</div>
+              <button type="button" className="v" onClick={cycleSkin}>
+                {skinOptions.find((s) => s.value === skin)?.label ??
+                  skinOptions[0].label}
+              </button>
+            </div>
+          )}
+          {/* "TEMA" sigue siendo exclusivo de Tetris: es el único con CSS
+              Module claro/oscuro. */}
           {isTetris && (
-            <>
-              <div className="hud-stat">
-                <div className="l">Skin</div>
-                <button type="button" className="v" onClick={cycleTetrisSkin}>
-                  {TETRIS_SKINS.find((s) => s.value === tetrisSkin)?.label ??
-                    "Retro"}
-                </button>
-              </div>
-              <div className="hud-stat">
-                <div className="l">Tema</div>
-                <button type="button" className="v" onClick={toggleTetrisTheme}>
-                  {tetrisTheme === "dark" ? "OSCURO" : "CLARO"}
-                </button>
-              </div>
-            </>
+            <div className="hud-stat">
+              <div className="l">Tema</div>
+              <button type="button" className="v" onClick={toggleTetrisTheme}>
+                {tetrisTheme === "dark" ? "OSCURO" : "CLARO"}
+              </button>
+            </div>
           )}
         </div>
         <div className="hud-actions">
@@ -414,6 +448,7 @@ export function GamePlayer({ game }: { game: Game }) {
             <AsteroidsCanvas
               ref={canvasRef}
               paused={paused || over}
+              skin={skin as GameSkin}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
@@ -423,7 +458,7 @@ export function GamePlayer({ game }: { game: Game }) {
             <TetrisCanvas
               ref={canvasRef}
               paused={paused || over}
-              skin={tetrisSkin}
+              skin={skin as TetrisSkin}
               theme={tetrisTheme}
               onScoreChange={setScore}
               onLivesChange={setLives}
