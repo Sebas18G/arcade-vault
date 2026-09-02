@@ -6,6 +6,7 @@ import type {
   GameCanvasHandle,
   GameCanvasProps,
 } from "@/components/games/shared/types";
+import type { GameSkin } from "@/components/games/shared/skins";
 const CONTROL_KEYS = [
   "Space",
   "ArrowUp",
@@ -13,11 +14,21 @@ const CONTROL_KEYS = [
   "ArrowLeft",
   "ArrowRight",
 ];
+type AsteroidsCanvasProps = GameCanvasProps<AsteroidsGameOverResult> & {
+  skin?: GameSkin;
+};
 export const AsteroidsCanvas = forwardRef<
   GameCanvasHandle,
-  GameCanvasProps<AsteroidsGameOverResult>
+  AsteroidsCanvasProps
 >(function AsteroidsCanvas(
-  { paused, onScoreChange, onLivesChange, onLevelChange, onGameOver },
+  {
+    paused,
+    skin = "classic",
+    onScoreChange,
+    onLivesChange,
+    onLevelChange,
+    onGameOver,
+  },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -47,6 +58,7 @@ export const AsteroidsCanvas = forwardRef<
       onGameOver: (result) => callbacksRef.current.onGameOver(result),
     });
     engineRef.current = engine;
+    engine.setSkin(skin);
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement && document.activeElement.tagName === "INPUT")
         return;
@@ -76,10 +88,14 @@ export const AsteroidsCanvas = forwardRef<
       window.removeEventListener("keyup", handleKeyUp);
       engineRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     engineRef.current?.setPaused(paused);
   }, [paused]);
+  useEffect(() => {
+    engineRef.current?.setSkin(skin);
+  }, [skin]);
   useImperativeHandle(ref, () => ({
     restart: () => engineRef.current?.restart(),
   }));

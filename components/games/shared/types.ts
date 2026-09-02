@@ -1,3 +1,4 @@
+import type { GameSkin } from "@/components/games/shared/skins";
 export type GameOverResult = {
   score: number;
   level: number;
@@ -20,6 +21,8 @@ export type LeaderboardEntry = {
 };
 export type GameCanvasProps<TResult extends GameOverResult = GameOverResult> = {
   paused: boolean;
+  /** Opcional: los canvas todavía sin skins (arkanoid, snake) lo ignoran. */
+  skin?: GameSkin;
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
   onLevelChange: (level: number) => void;

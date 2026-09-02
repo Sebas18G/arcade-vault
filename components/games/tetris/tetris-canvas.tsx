@@ -24,7 +24,9 @@ import type {
   GameCanvasProps,
   TetrisGameOverResult,
 } from "@/components/games/shared/types";
-type TetrisCanvasProps = GameCanvasProps<TetrisGameOverResult> & {
+// Tetris tiene sus propias 4 skins, así que reemplaza el `skin?: GameSkin`
+// del contrato compartido en vez de intersecarlo.
+type TetrisCanvasProps = Omit<GameCanvasProps<TetrisGameOverResult>, "skin"> & {
   skin: TetrisSkin;
   theme: "dark" | "light";
 };
