@@ -37,7 +37,14 @@ export const SnakeCanvas = forwardRef<
   GameCanvasHandle,
   GameCanvasProps<SnakeGameOverResult>
 >(function SnakeCanvas(
-  { paused, onScoreChange, onLivesChange, onLevelChange, onGameOver },
+  {
+    paused,
+    skin = "classic",
+    onScoreChange,
+    onLivesChange,
+    onLevelChange,
+    onGameOver,
+  },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,6 +74,7 @@ export const SnakeCanvas = forwardRef<
       onGameOver: (result) => callbacksRef.current.onGameOver(result),
     });
     engineRef.current = engine;
+    engine.setSkin(skin);
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement && document.activeElement.tagName === "INPUT")
         return;
@@ -98,10 +106,14 @@ export const SnakeCanvas = forwardRef<
       window.removeEventListener("keyup", handleKeyUp);
       engineRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     engineRef.current?.setPaused(paused);
   }, [paused]);
+  useEffect(() => {
+    engineRef.current?.setSkin(skin);
+  }, [skin]);
   useImperativeHandle(ref, () => ({
     restart: () => engineRef.current?.restart(),
   }));
