@@ -194,6 +194,7 @@ export function About() {
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="px_kai"
+                    maxLength={80}
                     disabled={status === "sending"}
                   />
                 </div>
@@ -204,6 +205,7 @@ export function About() {
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
                     placeholder="jugador@vault.gg"
+                    maxLength={254}
                     disabled={status === "sending"}
                   />
                 </div>
@@ -214,6 +216,7 @@ export function About() {
                     value={form.msg}
                     onChange={(e) => setForm({ ...form, msg: e.target.value })}
                     placeholder="Cuéntanos qué tienes en mente…"
+                    maxLength={4000}
                     disabled={status === "sending"}
                   ></textarea>
                 </div>
