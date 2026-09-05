@@ -8,7 +8,7 @@ import {
   DEFAULT_GAME_SKIN,
   type GameSkin,
 } from "@/components/games/shared/skins";
-const PLAYER_NAME_KEY = "asteroids_player_name";
+import { requireUserId } from "@/components/games/shared/session";
 // Preferencia de UI: vive solo en localStorage, nunca en Supabase.
 const SKIN_KEY = "asteroids-skin";
 const MAX_ENTRIES = 5;
@@ -34,29 +34,17 @@ export async function addAsteroidsScore(
   result: AsteroidsGameOverResult,
 ): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
+  const userId = await requireUserId(supabase);
   const { error } = await supabase.from("asteroids_scores").insert({
     player_name: name,
     score: result.score,
     level: result.level,
     asteroids_destroyed: result.asteroidsDestroyed,
     best_combo: result.bestCombo,
+    user_id: userId,
   });
   if (error) throw error;
   return getAsteroidsLeaderboard();
-}
-export function getSavedPlayerName(): string {
-  try {
-    return localStorage.getItem(PLAYER_NAME_KEY) || "";
-  } catch {
-    return "";
-  }
-}
-export function setSavedPlayerName(name: string): void {
-  try {
-    localStorage.setItem(PLAYER_NAME_KEY, name);
-  } catch {
-    // localStorage no disponible
-  }
 }
 export function getAsteroidsSkin(): GameSkin {
   try {

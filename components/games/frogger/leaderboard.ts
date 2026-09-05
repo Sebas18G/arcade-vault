@@ -8,6 +8,7 @@ import {
   DEFAULT_GAME_SKIN,
   type GameSkin,
 } from "@/components/games/shared/skins";
+import { requireUserId } from "@/components/games/shared/session";
 // Preferencia de UI: vive solo en localStorage, nunca en Supabase.
 const SKIN_KEY = "frogger-skin";
 const MAX_ENTRIES = 5;
@@ -31,12 +32,14 @@ export async function addFroggerScore(
   result: FroggerGameOverResult,
 ): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
+  const userId = await requireUserId(supabase);
   const { error } = await supabase.from("frogger_scores").insert({
     player_name: name,
     score: result.score,
     level: result.level,
     frogs_home: result.frogsHome,
     time_bonus: result.timeBonus,
+    user_id: userId,
   });
   if (error) throw error;
   return getFroggerLeaderboard();

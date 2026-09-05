@@ -2,9 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Game } from "@/app/data/games";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, type UserSession } from "@/lib/auth-context";
 import { addScore } from "@/lib/storage";
-import type { UserSession } from "@/lib/storage";
 import type {
   AsteroidsGameOverResult,
   FroggerGameOverResult,
@@ -19,9 +18,7 @@ import {
   addAsteroidsScore,
   getAsteroidsLeaderboard,
   getAsteroidsSkin,
-  getSavedPlayerName,
   setAsteroidsSkin,
-  setSavedPlayerName,
 } from "@/components/games/asteroids/leaderboard";
 import { TetrisCanvas } from "@/components/games/tetris/tetris-canvas";
 import type { TetrisSkin } from "@/components/games/tetris/engine";
@@ -101,7 +98,6 @@ function GameOverModal({
   level,
   user,
   leaderboard,
-  defaultName,
   onRestart,
 }: {
   game: Game;
@@ -114,16 +110,19 @@ function GameOverModal({
     fetchError?: string | null;
     onSaveName: (name: string) => void | Promise<void>;
   };
-  defaultName?: string;
   onRestart: () => void;
 }) {
-  const [name, setName] = useState(
-    () => defaultName ?? user?.name ?? "INVITADO",
-  );
+  // El alias del perfil es la única firma posible de un puntaje: ya no hay input
+  // libre (RLS exige user_id = auth.uid(), y player_name viene de profiles).
+  const name = user?.name ?? "";
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveScore = async () => {
+    if (!name) {
+      setSaveError("Tu sesión expiró. Vuelve a iniciar sesión para guardar.");
+      return;
+    }
     if (leaderboard) {
       setSaving(true);
       setSaveError(null);
@@ -200,18 +199,22 @@ function GameOverModal({
           )}
         {!saved ? (
           <div className="input-row">
-            <input
-              value={name}
-              onChange={(e) =>
-                setName(e.target.value.toUpperCase().slice(0, 10))
-              }
-              placeholder="TUS INICIALES"
-              disabled={saving}
-            />
+            <div
+              className="pixel neon-cyan"
+              style={{
+                flex: 1,
+                alignSelf: "center",
+                fontSize: 13,
+                letterSpacing: "0.12em",
+                textAlign: "center",
+              }}
+            >
+              {name || "SIN SESIÓN"}
+            </div>
             <button
               className="btn yellow"
               onClick={saveScore}
-              disabled={saving}
+              disabled={saving || !name}
             >
               {saving ? "GUARDANDO..." : "GUARDAR PUNTUACIÓN"}
             </button>
@@ -444,7 +447,7 @@ export function GamePlayer({ game }: { game: Game }) {
           <div className="hud-stat">
             <div className="l">Jugador</div>
             <div className="v" style={{ color: "var(--ink)" }}>
-              {user?.name ?? "INVITADO"}
+              {user?.name ?? "..."}
             </div>
           </div>
           <div className="hud-stat">
@@ -612,11 +615,6 @@ export function GamePlayer({ game }: { game: Game }) {
                       : undefined
           }
           user={user}
-          defaultName={
-            isAsteroids
-              ? getSavedPlayerName() || user?.name || "INVITADO"
-              : undefined
-          }
           leaderboard={
             isAsteroids
               ? {
@@ -630,7 +628,6 @@ export function GamePlayer({ game }: { game: Game }) {
                       asteroidsDestroyed: 0,
                       bestCombo: 0,
                     };
-                    setSavedPlayerName(name);
                     const entries = await addAsteroidsScore(name, result);
                     setLeaderboardEntries(entries);
                   },

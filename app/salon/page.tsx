@@ -90,7 +90,7 @@ export default function HallOfFamePage() {
       const { data } = await supabase
         .from(table)
         .select("id, player_name, score, created_at")
-        .eq("player_name", user.name)
+        .eq("user_id", user.id)
         .order("score", { ascending: false })
         .limit(1);
       if (!cancelled) setYouRow(mapRows(data)[0] ?? null);
