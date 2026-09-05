@@ -2,6 +2,7 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/safe-next";
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 10;
 // Los mensajes de Supabase Auth llegan en inglés: se traducen aquí para que la
@@ -34,7 +35,7 @@ function AuthCard() {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/games";
+  const next = safeNext(searchParams.get("next"));
   const switchTab = (value: "in" | "up") => {
     setTab(value);
     setError(null);
