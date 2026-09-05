@@ -12,6 +12,9 @@ export const START_ROW = 12;
 export const HOME_COLS = [1, 4, 7, 10, 13] as const;
 export const START_LIVES = 3;
 export const TIMER_SECONDS = 30;
+/** Columna donde arranca cada rana: la misma que la casa central. */
+export const START_COL = 7;
+export type FroggerDirection = "UP" | "DOWN" | "LEFT" | "RIGHT";
 type LaneKind = "road" | "log" | "turtles";
 type Lane = {
   row: number;
@@ -137,6 +140,28 @@ const DIVE_SINKING_UNTIL = 0.78;
 const LEVEL_SPEED_STEP = 0.15;
 /** Evita saltos gigantes de simulación si la pestaña estuvo en background. */
 const MAX_FRAME_MS = 100;
+/**
+ * Margen que se le perdona a la rana en la colisión con vehículos: sin él,
+ * rozar el píxel del guardabarros ya mata y el juego se siente injusto.
+ */
+const FROG_HITBOX_INSET = 8;
+const SCORE_PER_ROW = 10;
+const SCORE_PER_HOME = 50;
+const SCORE_PER_HALF_SECOND = 10;
+const SCORE_LADY_FROG = 200;
+const SCORE_FLY = 200;
+const SCORE_LEVEL_CLEAR = 1000;
+const EXTRA_LIFE_SCORE = 20000;
+/**
+ * Cadencias de la rana rosa y de la mosca. La spec las deja "pendientes de
+ * confirmar" — las fuentes no publican los valores del original —, así que se
+ * fijan acá: lo bastante frecuentes para que valga la pena esperarlas, lo
+ * bastante escasas para que no sean la fuente principal de puntos.
+ */
+const LADY_SPAWN_MS = 15000;
+const LADY_LIFETIME_MS = 12000;
+const FLY_SPAWN_MS = 10000;
+const FLY_LIFETIME_MS = 8000;
 const COLORS = {
   water: "#0b2a63",
   road: "#2b2b2b",
@@ -151,6 +176,15 @@ const COLORS = {
   turtleShell: "#2a7d4b",
   car: ["#e0473e", "#f2c14e", "#4ea8de", "#c46bd6", "#ff8c42"],
   truck: "#d9d9d9",
+  frog: "#7fe86b",
+  frogLeg: "#4fb83c",
+  frogEye: "#0d1a0d",
+  lady: "#ff7ac6",
+  fly: "#1a1a1a",
+  flyWing: "#e8e8e8",
+  timerTrack: "#1a1a1a",
+  timerFill: "#3fae6a",
+  timerLow: "#e0473e",
 } as const;
 type Entity = {
   /** Borde izquierdo, en píxeles con decimales. */
@@ -167,6 +201,16 @@ type LaneState = {
   /** Distancia entre dos entidades consecutivas del carril. */
   periodPx: number;
 };
+/**
+ * La rana guarda su fila como entero (salta de celda en celda) y su posición
+ * horizontal en píxeles con decimales, porque montada sobre una plataforma se
+ * desplaza de forma continua. Solo el salto la vuelve a alinear a la columna.
+ */
+type Frog = {
+  /** Borde izquierdo, en píxeles con decimales. */
+  x: number;
+  row: number;
+};
 export type FroggerEngineCallbacks = {
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
@@ -181,6 +225,28 @@ export class FroggerEngine {
   private level = 1;
   private lives = START_LIVES;
   private lanes: LaneState[] = [];
+  private frog: Frog = { x: START_COL * CELL_PX, row: START_ROW };
+  /** Una entrada por casa de `HOME_COLS`: true = ya tiene rana dentro. */
+  private homes: boolean[] = HOME_COLS.map(() => false);
+  private frogsHome = 0;
+  /** Milisegundos que le quedan a la rana actual antes de agotar el tiempo. */
+  private timerMs = TIMER_SECONDS * 1000;
+  /** Fila más adelantada alcanzada por la rana actual (menor = más lejos). */
+  private maxRowReached = START_ROW;
+  /** Total de puntos ganados por tiempo sin usar; viaja en el game over. */
+  private timeBonus = 0;
+  /** La rana extra de los 20 000 se otorga una sola vez por partida. */
+  private extraLifeAwarded = false;
+  /** Rana rosa: viaja pegada a un tronco hasta que se la recoge o expira. */
+  private lady: { row: number; entity: Entity; offsetPx: number } | null = null;
+  private ladySpawnMs = LADY_SPAWN_MS;
+  private ladyLifeMs = 0;
+  /** True mientras la rana lleva a la rana rosa encima. */
+  private carryingLady = false;
+  /** Mosca: se posa en un nenúfar libre y da puntos extra a quien llegue. */
+  private fly: { slot: number } | null = null;
+  private flySpawnMs = FLY_SPAWN_MS;
+  private flyLifeMs = 0;
   /** Reloj interno del motor, en ms; alimenta el ciclo de las tortugas. */
   private elapsedMs = 0;
   constructor(callbacks: FroggerEngineCallbacks) {
@@ -193,7 +259,16 @@ export class FroggerEngine {
     this.lives = START_LIVES;
     this.elapsedMs = 0;
     this.screen = "playing";
+    this.homes = HOME_COLS.map(() => false);
+    this.frogsHome = 0;
+    this.timeBonus = 0;
+    this.extraLifeAwarded = false;
+    this.lady = null;
+    this.ladySpawnMs = LADY_SPAWN_MS;
+    this.fly = null;
+    this.flySpawnMs = FLY_SPAWN_MS;
     this.buildLanes();
+    this.resetFrog();
     this.callbacks.onScoreChange(this.score);
     this.callbacks.onLivesChange(this.lives);
     this.callbacks.onLevelChange(this.level);
@@ -201,6 +276,53 @@ export class FroggerEngine {
   setPaused(paused: boolean) {
     this.paused = paused;
   }
+  /**
+   * Devuelve la rana a la orilla de salida y reinicia su temporizador. Se usa
+   * tanto al empezar como después de cada muerte y de cada rana llegada a casa.
+   */
+  private resetFrog() {
+    this.frog = { x: START_COL * CELL_PX, row: START_ROW };
+    this.timerMs = TIMER_SECONDS * 1000;
+    // El avance se puntúa "por vida": la próxima rana vuelve a cobrar sus filas.
+    this.maxRowReached = START_ROW;
+    this.carryingLady = false;
+  }
+  /** Suma puntos y otorga la rana extra la primera vez que se cruzan 20 000. */
+  private addScore(points: number) {
+    this.score += points;
+    if (!this.extraLifeAwarded && this.score >= EXTRA_LIFE_SCORE) {
+      this.extraLifeAwarded = true;
+      this.lives += 1;
+      this.callbacks.onLivesChange(this.lives);
+    }
+    this.callbacks.onScoreChange(this.score);
+  }
+  /**
+   * Un salto mueve exactamente una celda. En horizontal parte de la columna
+   * más cercana a la posición actual, así que el arrastre de una plataforma
+   * nunca deja la rana a medio camino entre dos columnas.
+   */
+  keyDown(direction: FroggerDirection) {
+    if (this.paused || this.screen !== "playing") return;
+    if (direction === "UP" || direction === "DOWN") {
+      const next = this.frog.row + (direction === "UP" ? -1 : 1);
+      this.frog.row = Math.max(HOME_ROW, Math.min(START_ROW, next));
+      // Solo la primera vez que esta rana pisa una fila más adelantada: ir y
+      // volver sobre lo ya recorrido no vuelve a pagar (ver Decisions).
+      if (this.frog.row < this.maxRowReached) {
+        this.addScore((this.maxRowReached - this.frog.row) * SCORE_PER_ROW);
+        this.maxRowReached = this.frog.row;
+      }
+      return;
+    }
+    const col =
+      Math.round(this.frog.x / CELL_PX) + (direction === "LEFT" ? -1 : 1);
+    const clamped = Math.max(0, Math.min(COLS - 1, col));
+    this.frog.x = clamped * CELL_PX;
+  }
+  // Sin estado que liberar al soltar la tecla; existe por simetría con el resto
+  // de motores del repo.
+  keyUp(_direction: FroggerDirection) {}
   /** Multiplicador de velocidad del nivel actual. */
   private speedFactor(): number {
     return 1 + (this.level - 1) * LEVEL_SPEED_STEP;
@@ -247,6 +369,200 @@ export class FroggerEngine {
           entity.x += total;
       }
     }
+    this.ridePlatform(seconds, factor);
+    this.timerMs -= step;
+    this.updateBonuses(step);
+    this.checkDeaths();
+  }
+  /**
+   * Las seis muertes de la spec, evaluadas en el orden en que ocurren en el
+   * tablero. La primera que dispara corta la cadena: una muerte descuenta
+   * exactamente una vida.
+   */
+  private checkDeaths() {
+    if (this.screen !== "playing") return;
+    // 6 — el tiempo se agotó.
+    if (this.timerMs <= 0) {
+      this.die();
+      return;
+    }
+    // 4 — arrastrada fuera del borde montada en una plataforma.
+    if (this.frog.x < 0 || this.frog.x + CELL_PX > FROGGER_WIDTH) {
+      this.die();
+      return;
+    }
+    // 5 — llegó a la fila de casas: nenúfar libre, nenúfar ocupado o matorral.
+    if (this.frog.row === HOME_ROW) {
+      this.resolveHomeRow();
+      return;
+    }
+    // 1 — atropellada en la carretera.
+    if ((ROAD_ROWS as readonly number[]).includes(this.frog.row)) {
+      if (this.hitByVehicle()) this.die();
+      return;
+    }
+    // 2 y 3 — agua sin plataforma, o tortuga sumergida.
+    if ((RIVER_ROWS as readonly number[]).includes(this.frog.row)) {
+      const platform = this.platformUnderFrog();
+      if (!platform) {
+        this.die();
+        return;
+      }
+      if (this.diveState(platform.entity, platform.state.lane) === "down") {
+        this.die();
+      }
+    }
+  }
+  /** Solapamiento de la caja de la rana con algún vehículo de su carril. */
+  private hitByVehicle(): boolean {
+    const state = this.lanes.find((l) => l.lane.row === this.frog.row);
+    if (!state) return false;
+    const left = this.frog.x + FROG_HITBOX_INSET;
+    const right = this.frog.x + CELL_PX - FROG_HITBOX_INSET;
+    return state.entities.some((e) => left < e.x + e.widthPx && right > e.x);
+  }
+  /**
+   * La columna de la casa se resuelve por proximidad, porque la rana puede
+   * llegar desalineada desde un tronco. Fuera de un nenúfar libre, todo lo
+   * demás en esa fila —matorral o casa ya ocupada— es muerte.
+   */
+  private resolveHomeRow() {
+    const col = Math.round(this.frog.x / CELL_PX);
+    const slot = HOME_COLS.indexOf(col as (typeof HOME_COLS)[number]);
+    if (slot === -1 || this.homes[slot]) {
+      this.die();
+      return;
+    }
+    this.reachHome(slot);
+  }
+  /** Rana a salvo en un nenúfar libre: casa, tiempo sobrante y extras. */
+  private reachHome(slot: number) {
+    this.homes[slot] = true;
+    this.frogsHome += 1;
+    const bonus =
+      Math.floor(Math.max(0, this.timerMs) / 500) * SCORE_PER_HALF_SECOND;
+    this.timeBonus += bonus;
+    let points = SCORE_PER_HOME + bonus;
+    if (this.carryingLady) points += SCORE_LADY_FROG;
+    if (this.fly?.slot === slot) {
+      points += SCORE_FLY;
+      this.fly = null;
+      this.flySpawnMs = FLY_SPAWN_MS;
+    }
+    this.addScore(points);
+    if (this.homes.every(Boolean)) this.clearLevel();
+    this.resetFrog();
+  }
+  /** Las 5 casas llenas: bonus, nivel nuevo, tablero vacío y todo más rápido. */
+  private clearLevel() {
+    this.addScore(SCORE_LEVEL_CLEAR);
+    this.level += 1;
+    this.callbacks.onLevelChange(this.level);
+    this.homes = HOME_COLS.map(() => false);
+    // Las velocidades no se tocan acá: `speedFactor()` las deriva del nivel.
+    this.fly = null;
+    this.flySpawnMs = FLY_SPAWN_MS;
+  }
+  /**
+   * Rana rosa y mosca: aparecen, envejecen y expiran. La rosa viaja pegada a
+   * un tronco y se recoge montándose encima; la mosca espera en un nenúfar.
+   */
+  private updateBonuses(step: number) {
+    if (this.lady) {
+      this.ladyLifeMs -= step;
+      const x = this.lady.entity.x + this.lady.offsetPx;
+      if (this.ladyLifeMs <= 0 || x < 0 || x + CELL_PX > FROGGER_WIDTH) {
+        this.lady = null;
+        this.ladySpawnMs = LADY_SPAWN_MS;
+      } else if (
+        this.frog.row === this.lady.row &&
+        Math.abs(this.frog.x - x) < CELL_PX * 0.6
+      ) {
+        this.carryingLady = true;
+        this.lady = null;
+        this.ladySpawnMs = LADY_SPAWN_MS;
+      }
+    } else {
+      this.ladySpawnMs -= step;
+      if (this.ladySpawnMs <= 0) this.spawnLady();
+    }
+    if (this.fly) {
+      this.flyLifeMs -= step;
+      // Un nivel nuevo puede haber vaciado su casa mientras ella esperaba.
+      if (this.flyLifeMs <= 0 || this.homes[this.fly.slot]) {
+        this.fly = null;
+        this.flySpawnMs = FLY_SPAWN_MS;
+      }
+    } else {
+      this.flySpawnMs -= step;
+      if (this.flySpawnMs <= 0) this.spawnFly();
+    }
+  }
+  private spawnLady() {
+    const logs = this.lanes.filter((l) => l.lane.kind === "log");
+    const state = logs[Math.floor(Math.random() * logs.length)];
+    if (!state) return;
+    const visible = state.entities.filter(
+      (e) => e.x >= 0 && e.x + e.widthPx <= FROGGER_WIDTH,
+    );
+    const entity = visible[Math.floor(Math.random() * visible.length)];
+    if (!entity) return; // Ningún tronco entero a la vista: se reintenta luego.
+    this.lady = {
+      row: state.lane.row,
+      entity,
+      offsetPx: (entity.widthPx - CELL_PX) / 2,
+    };
+    this.ladyLifeMs = LADY_LIFETIME_MS;
+  }
+  private spawnFly() {
+    const free = this.homes
+      .map((occupied, slot) => (occupied ? -1 : slot))
+      .filter((slot) => slot !== -1);
+    if (free.length === 0) return;
+    this.fly = { slot: free[Math.floor(Math.random() * free.length)] };
+    this.flyLifeMs = FLY_LIFETIME_MS;
+  }
+  private die() {
+    this.lives -= 1;
+    this.callbacks.onLivesChange(Math.max(0, this.lives));
+    if (this.lives <= 0) {
+      this.gameOver();
+      return;
+    }
+    this.resetFrog();
+  }
+  private gameOver() {
+    this.screen = "gameover";
+    this.callbacks.onGameOver({
+      score: this.score,
+      level: this.level,
+      frogsHome: this.frogsHome,
+      timeBonus: this.timeBonus,
+    });
+  }
+  /**
+   * La rana montada viaja con su plataforma. No se clampea al borde: salir de
+   * la pantalla arrastrada es una de las muertes de la spec.
+   */
+  private ridePlatform(seconds: number, factor: number) {
+    const platform = this.platformUnderFrog();
+    if (!platform) return;
+    const { lane } = platform.state;
+    this.frog.x += lane.dir * lane.speedPxPerSec * factor * seconds;
+  }
+  /**
+   * Plataforma bajo la rana, si la hay. El criterio es solapamiento de
+   * píxeles — el centro de la rana dentro del tronco o de la hilera —, nunca
+   * igualdad de columna: la rana casi siempre está desalineada mientras viaja.
+   */
+  private platformUnderFrog(): { state: LaneState; entity: Entity } | null {
+    const state = this.lanes.find((l) => l.lane.row === this.frog.row);
+    if (!state || state.lane.kind === "road") return null;
+    const center = this.frog.x + CELL_PX / 2;
+    const entity = state.entities.find(
+      (e) => center >= e.x && center <= e.x + e.widthPx,
+    );
+    return entity ? { state, entity } : null;
   }
   /** Estado de inmersión de una tortuga en el instante actual. */
   private diveState(entity: Entity, lane: Lane): "up" | "sinking" | "down" {
@@ -295,7 +611,7 @@ export class FroggerEngine {
   private drawHomeRow(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = COLORS.bush;
     ctx.fillRect(0, HOME_ROW * CELL_PX, FROGGER_WIDTH, CELL_PX);
-    for (const col of HOME_COLS) {
+    HOME_COLS.forEach((col, slot) => {
       const x = col * CELL_PX;
       const y = HOME_ROW * CELL_PX;
       ctx.fillStyle = COLORS.home;
@@ -304,7 +620,21 @@ export class FroggerEngine {
       ctx.beginPath();
       ctx.arc(x + CELL_PX / 2, y + CELL_PX / 2, CELL_PX * 0.34, 0, Math.PI * 2);
       ctx.fill();
-    }
+      // Casa ocupada: se ve la rana dentro, y saltar ahí vuelve a ser muerte.
+      if (this.homes[slot]) this.drawFrogAt(ctx, x, y);
+    });
+  }
+  /** Barra de tiempo de la rana actual, pegada al borde inferior del canvas. */
+  private drawTimer(ctx: CanvasRenderingContext2D) {
+    const totalMs = TIMER_SECONDS * 1000;
+    const ratio = Math.max(0, Math.min(1, this.timerMs / totalMs));
+    const height = 6;
+    const y = FROGGER_HEIGHT - height;
+    ctx.fillStyle = COLORS.timerTrack;
+    ctx.fillRect(0, y, FROGGER_WIDTH, height);
+    // Se vacía desde la izquierda y avisa en rojo el último cuarto.
+    ctx.fillStyle = ratio < 0.25 ? COLORS.timerLow : COLORS.timerFill;
+    ctx.fillRect(0, y, FROGGER_WIDTH * ratio, height);
   }
   private drawLog(ctx: CanvasRenderingContext2D, entity: Entity, y: number) {
     const top = y + 8;
@@ -377,8 +707,72 @@ export class FroggerEngine {
       }
     }
   }
+  /**
+   * Rana procedural: cuerpo, ojos y las cuatro patas. Sin assets. Recibe la
+   * esquina superior izquierda de su celda, así sirve tanto para la rana viva
+   * como para las que ya descansan en un nenúfar.
+   */
+  private drawFrogAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
+    const pad = 7;
+    const size = CELL_PX - pad * 2;
+    ctx.fillStyle = COLORS.frog;
+    ctx.fillRect(x + pad, y + pad, size, size);
+    // Patas: dos arriba, dos abajo, hacia afuera del cuerpo.
+    ctx.fillStyle = COLORS.frogLeg;
+    const legW = 9;
+    const legH = 6;
+    ctx.fillRect(x + pad - 3, y + pad + 3, legW, legH);
+    ctx.fillRect(x + CELL_PX - pad - legW + 3, y + pad + 3, legW, legH);
+    ctx.fillRect(x + pad - 3, y + CELL_PX - pad - legH - 3, legW, legH);
+    ctx.fillRect(
+      x + CELL_PX - pad - legW + 3,
+      y + CELL_PX - pad - legH - 3,
+      legW,
+      legH,
+    );
+    // Ojos, mirando siempre hacia arriba (la dirección de avance del juego).
+    ctx.fillStyle = COLORS.frogEye;
+    ctx.fillRect(x + pad + 5, y + pad + 4, 6, 6);
+    ctx.fillRect(x + CELL_PX - pad - 11, y + pad + 4, 6, 6);
+  }
+  /** Rana rosa esperando sobre su tronco. */
+  private drawLady(ctx: CanvasRenderingContext2D) {
+    if (!this.lady) return;
+    const x = this.lady.entity.x + this.lady.offsetPx;
+    const y = this.lady.row * CELL_PX;
+    ctx.fillStyle = COLORS.lady;
+    ctx.fillRect(x + 10, y + 10, CELL_PX - 20, CELL_PX - 20);
+    ctx.fillStyle = COLORS.frogEye;
+    ctx.fillRect(x + 16, y + 15, 5, 5);
+    ctx.fillRect(x + CELL_PX - 21, y + 15, 5, 5);
+  }
+  /** Mosca posada en un nenúfar libre. */
+  private drawFly(ctx: CanvasRenderingContext2D) {
+    if (!this.fly) return;
+    const x = HOME_COLS[this.fly.slot] * CELL_PX;
+    const y = HOME_ROW * CELL_PX;
+    const cx = x + CELL_PX / 2;
+    const cy = y + CELL_PX / 2;
+    ctx.fillStyle = COLORS.fly;
+    ctx.fillRect(cx - 5, cy - 4, 10, 8);
+    // Alas, a los lados del cuerpo.
+    ctx.fillStyle = COLORS.flyWing;
+    ctx.fillRect(cx - 12, cy - 6, 6, 5);
+    ctx.fillRect(cx + 6, cy - 6, 6, 5);
+  }
+  /** La rana rosa a cuestas se dibuja encima de la rana que la lleva. */
+  private drawCarriedLady(ctx: CanvasRenderingContext2D) {
+    if (!this.carryingLady) return;
+    ctx.fillStyle = COLORS.lady;
+    ctx.fillRect(this.frog.x + 17, this.frog.row * CELL_PX + 17, 16, 16);
+  }
   draw(ctx: CanvasRenderingContext2D) {
     this.drawBackground(ctx);
     this.drawLanes(ctx);
+    this.drawLady(ctx);
+    this.drawFly(ctx);
+    this.drawFrogAt(ctx, this.frog.x, this.frog.row * CELL_PX);
+    this.drawCarriedLady(ctx);
+    this.drawTimer(ctx);
   }
 }
