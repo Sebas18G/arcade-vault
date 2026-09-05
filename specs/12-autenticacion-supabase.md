@@ -1,6 +1,6 @@
 # SPEC 12 — Autenticación real con Supabase y bloqueo de rutas
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 01, SPEC 04, SPEC 06
 > **Date:** 2026-09-04
 > **Objective:** Reemplazar la sesión simulada de `localStorage` por autenticación real de Supabase (registro con usuario + correo + contraseña, login por correo, OAuth con Google y GitHub), con una tabla `profiles` que fija el alias del jugador, y bloquear las rutas de juego y del Salón de la Fama para quien no haya iniciado sesión.
