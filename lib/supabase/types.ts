@@ -1,4 +1,9 @@
 export type GameRow = { id: string; title: string; created_at: string };
+export type ProfileRow = {
+  id: string;
+  username: string;
+  created_at: string;
+};
 export type AsteroidsScoreRow = {
   id: string;
   player_name: string;
