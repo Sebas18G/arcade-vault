@@ -1,6 +1,6 @@
 # SPEC 09 — Frogger real: motor de canvas que reemplaza el reproductor simulado de `ranaria`
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** SPEC 01, SPEC 05
 > **Date:** 2026-08-30
 > **Objective:** Construir un motor real de canvas para Frogger (grilla 16×13, carretera de 5 carriles y río de 5 carriles) que reemplaza el reproductor simulado de la entrada `ranaria` del catálogo, todavía sin persistencia.
