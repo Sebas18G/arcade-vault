@@ -67,6 +67,7 @@ function AliasCard() {
         .from("profiles")
         .insert({ id: user.id, username });
       if (insertError) {
+        console.error("[alias] no se pudo insertar el perfil:", insertError);
         setError(
           insertError.code === "23505"
             ? "Ese alias ya está tomado. Elige otro."

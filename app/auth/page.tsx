@@ -92,6 +92,7 @@ function AuthCard() {
     if (profileError) {
       // Carrera por el alias (violación de unique) u otro fallo del insert: la
       // sesión ya existe, así que /auth/alias es la red de contención.
+      console.error("[auth] no se pudo insertar el perfil:", profileError);
       router.replace("/auth/alias");
       return;
     }
