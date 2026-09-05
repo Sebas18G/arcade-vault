@@ -1,6 +1,6 @@
 # SPEC 10 — Leaderboard propio de Frogger en Supabase
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 04, SPEC 06, SPEC 09
 > **Date:** 2026-09-04
 > **Objective:** Dar a Frogger su propia tabla de puntajes en Supabase (`frogger_scores`), conectada al modal de fin de partida, a la tarjeta de la biblioteca, a la ficha del juego y al Salón de la Fama, siguiendo el mismo patrón que los otros cuatro juegos reales.
