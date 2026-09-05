@@ -12,6 +12,12 @@ export type TetrisGameOverResult = GameOverResult & {
   bestCombo: number;
 };
 export type SnakeGameOverResult = GameOverResult; // sin stats extra, igual que Arkanoid
+export type FroggerGameOverResult = GameOverResult & {
+  /** Ranas totales llevadas a casa en la partida. */
+  frogsHome: number;
+  /** Puntos acumulados por tiempo sin usar del temporizador. */
+  timeBonus: number;
+};
 export type LeaderboardEntry = {
   id: string;
   name: string;

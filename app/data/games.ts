@@ -78,8 +78,8 @@ export const GAMES: Game[] = [
     plays: "15.6K",
   },
   {
-    id: "ranaria",
-    title: "RANARIA",
+    id: "frogger",
+    title: "FROGGER",
     short: "Cruza la autopista de pixeles.",
     long: "Salta entre carriles de coches a toda velocidad y troncos a la deriva en el río. Llega a los nenúfares antes de que se acabe el tiempo.",
     cat: "ARCADE",

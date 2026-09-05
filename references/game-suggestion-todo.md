@@ -26,7 +26,7 @@ Es legible y editable a mano: si quieres vetar un juego o cambiar un estado, edi
 | TETRIS      | `tetris`      | Implementado      | —      | 2026-08-30 |
 | SNAKE       | `snake`       | Implementado      | —      | 2026-08-30 |
 | ASTEROIDS   | `asteroids`   | Implementado      | —      | 2026-08-30 |
-| FROGGER     | `frogger`     | Aceptado          | 9/10   | 2026-08-30 |
+| FROGGER     | `frogger`     | Implementado      | 9/10   | 2026-09-04 |
 | INVASORES   | `invasores`   | Sugerido          | 9/10   | 2026-08-30 |
 | 2048        | `2048`        | Candidato natural | 9/10   | 2026-08-30 |
 | CIEMPIÉS    | `ciempies`    | Candidato natural | 8/10   | 2026-08-30 |
@@ -99,8 +99,10 @@ Es legible y editable a mano: si quieres vetar un juego o cambiar un estado, edi
 
 ### FROGGER (`frogger`, antes `ranaria`)
 
-**Estado:** Aceptado · **Encaje:** 9/10 · **Fecha:** 2026-08-30 · **Tipo:** upgrade de simulado
-**Situación:** entrada de catálogo con reproductor simulado. Sin motor real ni tabla propia todavía; sus tres specs ya están escritas y en estado `Draft`.
+**Estado:** Implementado · **Encaje:** 9/10 · **Fecha:** 2026-09-04 · **Tipo:** upgrade de simulado
+**Situación:** motor real jugable en `components/games/frogger/`. Todavía **sin leaderboard propio** (tabla `frogger_scores`): llega en la spec 10, y hasta entonces el modal de fin de partida no muestra top-5.
+**Implementado el 2026-09-04:** por `specs/games-jam/09-frogger-motor.md` (motor de canvas 800×650, grilla 16×13, 6 formas de morir, puntuación completa y progresión de nivel). El renombrado `ranaria` → `frogger` quedó aplicado en `app/data/games.ts`. Quedan pendientes sus dos specs hermanas: 10 (leaderboard en Supabase) y 11 (capa temática de la jam).
+**Valores fijados en la implementación** (los que la spec dejaba "pendientes de confirmar"): tabla de 10 carriles con sus velocidades documentada en `engine.ts`; inmersión de tortugas en ciclo de 7 s (62% a flote, 16% parpadeando, 22% sumergidas); rana rosa cada 15 s durante 12 s; mosca cada 10 s durante 8 s; los +10 por fila se cobran una sola vez por vida.
 **Aceptado el 2026-08-30 (ronda 2, game jam):** elegido por el skill `/game-jam` para el tema **"cruza la carretera y el río sin convertirte en papilla"**, que describe literalmente su bucle de juego. Su encaje sube de 8/10 a 9/10 al sumarse el criterio de **fuerza temática (10/10)** que la jam agrega a la Fase 2. La objeción de la ronda 1 (satura ARCADE) queda anulada por el tema recibido: el humano pidió este juego, no un hueco de catálogo.
 **Specs:** `specs/games-jam/09-frogger-motor.md` (motor) · `specs/games-jam/10-frogger-leaderboard.md` (tabla `frogger_scores`) · `specs/games-jam/11-frogger-anatomia-de-la-papilla.md` (capa temática: causas de muerte persistidas + selectores de skin y tema en el HUD).
 **Renombrado:** la ficha de `app/data/games.ts` pasa de `ranaria`/`RANARIA` a `frogger`/`FROGGER`, mismo patrón que las specs 06 y 08. El resto de sus campos no se toca.

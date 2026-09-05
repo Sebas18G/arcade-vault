@@ -7,6 +7,7 @@ import { addScore } from "@/lib/storage";
 import type { UserSession } from "@/lib/storage";
 import type {
   AsteroidsGameOverResult,
+  FroggerGameOverResult,
   GameCanvasHandle,
   GameOverResult,
   LeaderboardEntry,
@@ -45,6 +46,13 @@ import {
   getSnakeSkin,
   setSnakeSkin,
 } from "@/components/games/snake/leaderboard";
+// Frogger todavía no tiene leaderboard propio: llega en la spec 10. Su
+// leaderboard.ts hoy solo guarda la preferencia de skin en localStorage.
+import { FroggerCanvas } from "@/components/games/frogger/frogger-canvas";
+import {
+  getFroggerSkin,
+  setFroggerSkin,
+} from "@/components/games/frogger/leaderboard";
 const LIVES = 3;
 const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
   { value: "retro", label: "Retro" },
@@ -61,6 +69,7 @@ const SKINS_BY_GAME: Record<string, SkinOption[]> = {
   tetris: TETRIS_SKINS,
   asteroids: GAME_SKINS,
   snake: GAME_SKINS,
+  frogger: GAME_SKINS,
 };
 // Lectura/escritura de la preferencia, delegada al leaderboard.ts de cada juego.
 // Ambas claves son "<gameId>-skin" ("tetris-skin" es la que Tetris ya usaba,
@@ -80,6 +89,10 @@ const SKIN_STORAGE: Record<
   snake: {
     read: getSnakeSkin,
     write: (value) => setSnakeSkin(value as GameSkin),
+  },
+  frogger: {
+    read: getFroggerSkin,
+    write: (value) => setFroggerSkin(value as GameSkin),
   },
 };
 function GameOverModal({
@@ -232,7 +245,9 @@ export function GamePlayer({ game }: { game: Game }) {
   const isTetris = game.id === "tetris";
   const isArkanoid = game.id === "arkanoid";
   const isSnake = game.id === "snake";
-  const isPortedGame = isAsteroids || isTetris || isArkanoid || isSnake;
+  const isFrogger = game.id === "frogger";
+  const isPortedGame =
+    isAsteroids || isTetris || isArkanoid || isSnake || isFrogger;
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(LIVES);
   const [engineLevel, setEngineLevel] = useState(1);
@@ -247,6 +262,8 @@ export function GamePlayer({ game }: { game: Game }) {
     null,
   );
   const [snakeResult, setSnakeResult] = useState<GameOverResult | null>(null);
+  const [froggerResult, setFroggerResult] =
+    useState<FroggerGameOverResult | null>(null);
   const [leaderboardEntries, setLeaderboardEntries] = useState<
     LeaderboardEntry[]
   >([]);
@@ -305,6 +322,7 @@ export function GamePlayer({ game }: { game: Game }) {
     setTetrisResult(null);
     setArkanoidResult(null);
     setSnakeResult(null);
+    setFroggerResult(null);
     setLeaderboardEntries([]);
     setLeaderboardLoading(false);
     setLeaderboardFetchError(null);
@@ -371,6 +389,11 @@ export function GamePlayer({ game }: { game: Game }) {
     setOver(true);
     loadSnakeLeaderboard();
   };
+  // Sin carga de leaderboard: Frogger todavía no persiste puntajes (spec 10).
+  const handleFroggerGameOver = (result: FroggerGameOverResult) => {
+    setFroggerResult(result);
+    setOver(true);
+  };
   const handleForceEnd = () => {
     if (isAsteroids) {
       setAsteroidsResult({
@@ -392,6 +415,14 @@ export function GamePlayer({ game }: { game: Game }) {
     if (isSnake) {
       setSnakeResult({ score, level: engineLevel });
       loadSnakeLeaderboard();
+    }
+    if (isFrogger) {
+      setFroggerResult({
+        score,
+        level: engineLevel,
+        frogsHome: 0,
+        timeBonus: 0,
+      });
     }
     setOver(true);
   };
@@ -491,6 +522,16 @@ export function GamePlayer({ game }: { game: Game }) {
               onLevelChange={setEngineLevel}
               onGameOver={handleSnakeGameOver}
             />
+          ) : isFrogger ? (
+            <FroggerCanvas
+              ref={canvasRef}
+              paused={paused || over}
+              skin={skin as GameSkin}
+              onScoreChange={setScore}
+              onLivesChange={setLives}
+              onLevelChange={setEngineLevel}
+              onGameOver={handleFroggerGameOver}
+            />
           ) : (
             <div className="game-arena">
               <div className="grid-floor"></div>
@@ -542,7 +583,9 @@ export function GamePlayer({ game }: { game: Game }) {
                   ? (arkanoidResult?.score ?? score)
                   : isSnake
                     ? (snakeResult?.score ?? score)
-                    : score
+                    : isFrogger
+                      ? (froggerResult?.score ?? score)
+                      : score
           }
           level={
             isAsteroids
@@ -553,7 +596,9 @@ export function GamePlayer({ game }: { game: Game }) {
                   ? (arkanoidResult?.level ?? engineLevel)
                   : isSnake
                     ? (snakeResult?.level ?? engineLevel)
-                    : undefined
+                    : isFrogger
+                      ? (froggerResult?.level ?? engineLevel)
+                      : undefined
           }
           user={user}
           defaultName={
