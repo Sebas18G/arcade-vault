@@ -1,4 +1,6 @@
 import type { FroggerGameOverResult } from "@/components/games/shared/types";
+import type { GameSkin } from "@/components/games/shared/skins";
+import { FROGGER_SKIN_PALETTES, type FroggerPalette } from "./skins";
 export const FROGGER_WIDTH = 800;
 export const FROGGER_HEIGHT = 650;
 export const COLS = 16;
@@ -162,30 +164,8 @@ const LADY_SPAWN_MS = 15000;
 const LADY_LIFETIME_MS = 12000;
 const FLY_SPAWN_MS = 10000;
 const FLY_LIFETIME_MS = 8000;
-const COLORS = {
-  water: "#0b2a63",
-  road: "#2b2b2b",
-  laneMark: "#4a4a4a",
-  safe: "#1d3b2a",
-  bush: "#14401f",
-  home: "#0b2a63",
-  homeLily: "#2fbf5f",
-  log: "#8b5a2b",
-  logDark: "#6b4420",
-  turtle: "#3fae6a",
-  turtleShell: "#2a7d4b",
-  car: ["#e0473e", "#f2c14e", "#4ea8de", "#c46bd6", "#ff8c42"],
-  truck: "#d9d9d9",
-  frog: "#7fe86b",
-  frogLeg: "#4fb83c",
-  frogEye: "#0d1a0d",
-  lady: "#ff7ac6",
-  fly: "#1a1a1a",
-  flyWing: "#e8e8e8",
-  timerTrack: "#1a1a1a",
-  timerFill: "#3fae6a",
-  timerLow: "#e0473e",
-} as const;
+// Los colores ya no viven aquí: entran por `setSkin()` desde ./skins.
+// El motor nunca lee `document`, `window` ni `localStorage`.
 type Entity = {
   /** Borde izquierdo, en píxeles con decimales. */
   x: number;
@@ -249,9 +229,19 @@ export class FroggerEngine {
   private flyLifeMs = 0;
   /** Reloj interno del motor, en ms; alimenta el ciclo de las tortugas. */
   private elapsedMs = 0;
+  private skin: GameSkin = "classic";
+  private palette: FroggerPalette = FROGGER_SKIN_PALETTES.classic;
   constructor(callbacks: FroggerEngineCallbacks) {
     this.callbacks = callbacks;
     this.restart();
+  }
+  /** La paleta entra solo por acá: el motor no lee ninguna preferencia. */
+  setSkin(skin: GameSkin) {
+    this.skin = skin;
+    this.palette = FROGGER_SKIN_PALETTES[skin] ?? FROGGER_SKIN_PALETTES.classic;
+  }
+  getSkin(): GameSkin {
+    return this.skin;
   }
   restart() {
     this.score = 0;
@@ -572,9 +562,27 @@ export class FroggerEngine {
     if (t < DIVE_SINKING_UNTIL) return "sinking";
     return "down";
   }
+  /**
+   * Enciende el halo de la skin. `amount <= 0` (classic y retro) no toca el
+   * contexto, así que esas skins dibujan exactamente igual que antes.
+   */
+  private setGlow(
+    ctx: CanvasRenderingContext2D,
+    color: string,
+    amount: number,
+  ) {
+    if (amount <= 0) return;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = amount;
+  }
+  /** Apaga el halo. Se llama siempre tras dibujar, para que no se filtre. */
+  private clearGlow(ctx: CanvasRenderingContext2D) {
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "transparent";
+  }
   private drawBackground(ctx: CanvasRenderingContext2D) {
     // Río.
-    ctx.fillStyle = COLORS.water;
+    ctx.fillStyle = this.palette.water;
     ctx.fillRect(
       0,
       RIVER_ROWS[0] * CELL_PX,
@@ -582,7 +590,7 @@ export class FroggerEngine {
       RIVER_ROWS.length * CELL_PX,
     );
     // Carretera.
-    ctx.fillStyle = COLORS.road;
+    ctx.fillStyle = this.palette.road;
     ctx.fillRect(
       0,
       ROAD_ROWS[0] * CELL_PX,
@@ -590,7 +598,7 @@ export class FroggerEngine {
       ROAD_ROWS.length * CELL_PX,
     );
     // Líneas discontinuas entre carriles de carretera.
-    ctx.strokeStyle = COLORS.laneMark;
+    ctx.strokeStyle = this.palette.laneMark;
     ctx.lineWidth = 2;
     ctx.setLineDash([14, 14]);
     for (let i = 1; i < ROAD_ROWS.length; i++) {
@@ -602,24 +610,26 @@ export class FroggerEngine {
     }
     ctx.setLineDash([]);
     // Orillas seguras: mediana y fila de salida.
-    ctx.fillStyle = COLORS.safe;
+    ctx.fillStyle = this.palette.safe;
     ctx.fillRect(0, MEDIAN_ROW * CELL_PX, FROGGER_WIDTH, CELL_PX);
     ctx.fillRect(0, START_ROW * CELL_PX, FROGGER_WIDTH, CELL_PX);
     this.drawHomeRow(ctx);
   }
   /** Fila 0: matorral continuo con cinco nenúfares recortados encima. */
   private drawHomeRow(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = COLORS.bush;
+    ctx.fillStyle = this.palette.bush;
     ctx.fillRect(0, HOME_ROW * CELL_PX, FROGGER_WIDTH, CELL_PX);
     HOME_COLS.forEach((col, slot) => {
       const x = col * CELL_PX;
       const y = HOME_ROW * CELL_PX;
-      ctx.fillStyle = COLORS.home;
+      ctx.fillStyle = this.palette.home;
       ctx.fillRect(x, y, CELL_PX, CELL_PX);
-      ctx.fillStyle = COLORS.homeLily;
+      ctx.fillStyle = this.palette.homeLily;
+      this.setGlow(ctx, this.palette.homeLily, this.palette.glow.lily);
       ctx.beginPath();
       ctx.arc(x + CELL_PX / 2, y + CELL_PX / 2, CELL_PX * 0.34, 0, Math.PI * 2);
       ctx.fill();
+      this.clearGlow(ctx);
       // Casa ocupada: se ve la rana dentro, y saltar ahí vuelve a ser muerte.
       if (this.homes[slot]) this.drawFrogAt(ctx, x, y);
     });
@@ -630,18 +640,23 @@ export class FroggerEngine {
     const ratio = Math.max(0, Math.min(1, this.timerMs / totalMs));
     const height = 6;
     const y = FROGGER_HEIGHT - height;
-    ctx.fillStyle = COLORS.timerTrack;
+    ctx.fillStyle = this.palette.timerTrack;
     ctx.fillRect(0, y, FROGGER_WIDTH, height);
     // Se vacía desde la izquierda y avisa en rojo el último cuarto.
-    ctx.fillStyle = ratio < 0.25 ? COLORS.timerLow : COLORS.timerFill;
+    const fill = ratio < 0.25 ? this.palette.timerLow : this.palette.timerFill;
+    ctx.fillStyle = fill;
+    this.setGlow(ctx, fill, this.palette.glow.timer);
     ctx.fillRect(0, y, FROGGER_WIDTH * ratio, height);
+    this.clearGlow(ctx);
   }
   private drawLog(ctx: CanvasRenderingContext2D, entity: Entity, y: number) {
     const top = y + 8;
     const height = CELL_PX - 16;
-    ctx.fillStyle = COLORS.log;
+    ctx.fillStyle = this.palette.log;
+    this.setGlow(ctx, this.palette.log, this.palette.glow.platform);
     ctx.fillRect(entity.x, top, entity.widthPx, height);
-    ctx.fillStyle = COLORS.logDark;
+    this.clearGlow(ctx);
+    ctx.fillStyle = this.palette.logDark;
     ctx.fillRect(entity.x, top + height / 2 - 2, entity.widthPx, 4);
     // Tapas de los extremos: dan la lectura de tronco y no de tabla.
     ctx.fillRect(entity.x, top, 5, height);
@@ -664,11 +679,13 @@ export class FroggerEngine {
     for (let i = 0; i < count; i++) {
       const cx = entity.x + i * CELL_PX + CELL_PX / 2;
       const cy = y + CELL_PX / 2;
-      ctx.fillStyle = COLORS.turtle;
+      ctx.fillStyle = this.palette.turtle;
+      this.setGlow(ctx, this.palette.turtle, this.palette.glow.platform);
       ctx.beginPath();
       ctx.arc(cx, cy, CELL_PX * 0.36, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = COLORS.turtleShell;
+      this.clearGlow(ctx);
+      ctx.fillStyle = this.palette.turtleShell;
       ctx.beginPath();
       ctx.arc(cx, cy, CELL_PX * 0.2, 0, Math.PI * 2);
       ctx.fill();
@@ -684,12 +701,14 @@ export class FroggerEngine {
     const top = y + 9;
     const height = CELL_PX - 18;
     const isTruck = lane.spanCells > 1;
-    ctx.fillStyle = isTruck
-      ? COLORS.truck
-      : COLORS.car[(lane.row + entity.index) % COLORS.car.length];
+    const { car, truck } = this.palette;
+    const body = isTruck ? truck : car[(lane.row + entity.index) % car.length];
+    ctx.fillStyle = body;
+    this.setGlow(ctx, body, this.palette.glow.vehicle);
     ctx.fillRect(entity.x, top, entity.widthPx, height);
+    this.clearGlow(ctx);
     // Parabrisas del lado hacia el que avanza el vehículo.
-    ctx.fillStyle = "#1a1a1a";
+    ctx.fillStyle = this.palette.vehicleGlass;
     const glassW = 8;
     const glassX =
       lane.dir === 1 ? entity.x + entity.widthPx - glassW - 4 : entity.x + 4;
@@ -715,10 +734,12 @@ export class FroggerEngine {
   private drawFrogAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
     const pad = 7;
     const size = CELL_PX - pad * 2;
-    ctx.fillStyle = COLORS.frog;
+    ctx.fillStyle = this.palette.frog;
+    this.setGlow(ctx, this.palette.frog, this.palette.glow.frog);
     ctx.fillRect(x + pad, y + pad, size, size);
+    this.clearGlow(ctx);
     // Patas: dos arriba, dos abajo, hacia afuera del cuerpo.
-    ctx.fillStyle = COLORS.frogLeg;
+    ctx.fillStyle = this.palette.frogLeg;
     const legW = 9;
     const legH = 6;
     ctx.fillRect(x + pad - 3, y + pad + 3, legW, legH);
@@ -731,7 +752,7 @@ export class FroggerEngine {
       legH,
     );
     // Ojos, mirando siempre hacia arriba (la dirección de avance del juego).
-    ctx.fillStyle = COLORS.frogEye;
+    ctx.fillStyle = this.palette.frogEye;
     ctx.fillRect(x + pad + 5, y + pad + 4, 6, 6);
     ctx.fillRect(x + CELL_PX - pad - 11, y + pad + 4, 6, 6);
   }
@@ -740,9 +761,11 @@ export class FroggerEngine {
     if (!this.lady) return;
     const x = this.lady.entity.x + this.lady.offsetPx;
     const y = this.lady.row * CELL_PX;
-    ctx.fillStyle = COLORS.lady;
+    ctx.fillStyle = this.palette.lady;
+    this.setGlow(ctx, this.palette.lady, this.palette.glow.bonus);
     ctx.fillRect(x + 10, y + 10, CELL_PX - 20, CELL_PX - 20);
-    ctx.fillStyle = COLORS.frogEye;
+    this.clearGlow(ctx);
+    ctx.fillStyle = this.palette.frogEye;
     ctx.fillRect(x + 16, y + 15, 5, 5);
     ctx.fillRect(x + CELL_PX - 21, y + 15, 5, 5);
   }
@@ -753,18 +776,22 @@ export class FroggerEngine {
     const y = HOME_ROW * CELL_PX;
     const cx = x + CELL_PX / 2;
     const cy = y + CELL_PX / 2;
-    ctx.fillStyle = COLORS.fly;
+    ctx.fillStyle = this.palette.fly;
+    this.setGlow(ctx, this.palette.fly, this.palette.glow.bonus);
     ctx.fillRect(cx - 5, cy - 4, 10, 8);
+    this.clearGlow(ctx);
     // Alas, a los lados del cuerpo.
-    ctx.fillStyle = COLORS.flyWing;
+    ctx.fillStyle = this.palette.flyWing;
     ctx.fillRect(cx - 12, cy - 6, 6, 5);
     ctx.fillRect(cx + 6, cy - 6, 6, 5);
   }
   /** La rana rosa a cuestas se dibuja encima de la rana que la lleva. */
   private drawCarriedLady(ctx: CanvasRenderingContext2D) {
     if (!this.carryingLady) return;
-    ctx.fillStyle = COLORS.lady;
+    ctx.fillStyle = this.palette.lady;
+    this.setGlow(ctx, this.palette.lady, this.palette.glow.bonus);
     ctx.fillRect(this.frog.x + 17, this.frog.row * CELL_PX + 17, 16, 16);
+    this.clearGlow(ctx);
   }
   draw(ctx: CanvasRenderingContext2D) {
     this.drawBackground(ctx);

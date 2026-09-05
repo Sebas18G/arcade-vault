@@ -38,7 +38,14 @@ export const FroggerCanvas = forwardRef<
   GameCanvasHandle,
   GameCanvasProps<FroggerGameOverResult>
 >(function FroggerCanvas(
-  { paused, onScoreChange, onLivesChange, onLevelChange, onGameOver },
+  {
+    paused,
+    skin = "classic",
+    onScoreChange,
+    onLivesChange,
+    onLevelChange,
+    onGameOver,
+  },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -68,6 +75,7 @@ export const FroggerCanvas = forwardRef<
       onGameOver: (result) => callbacksRef.current.onGameOver(result),
     });
     engineRef.current = engine;
+    engine.setSkin(skin);
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement && document.activeElement.tagName === "INPUT")
         return;
@@ -99,10 +107,14 @@ export const FroggerCanvas = forwardRef<
       window.removeEventListener("keyup", handleKeyUp);
       engineRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     engineRef.current?.setPaused(paused);
   }, [paused]);
+  useEffect(() => {
+    engineRef.current?.setSkin(skin);
+  }, [skin]);
   useImperativeHandle(ref, () => ({
     restart: () => engineRef.current?.restart(),
   }));

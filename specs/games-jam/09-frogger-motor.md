@@ -1,6 +1,6 @@
 # SPEC 09 — Frogger real: motor de canvas que reemplaza el reproductor simulado de `ranaria`
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 01, SPEC 05
 > **Date:** 2026-08-30
 > **Objective:** Construir un motor real de canvas para Frogger (grilla 16×13, carretera de 5 carriles y río de 5 carriles) que reemplaza el reproductor simulado de la entrada `ranaria` del catálogo, todavía sin persistencia.
@@ -98,21 +98,21 @@ export type FroggerGameOverResult = GameOverResult & {
 
 ## Acceptance criteria
 
-- [ ] `/games/frogger/play` muestra el Frogger real dentro del `crt-screen`, en un canvas de 800×650 con las 13 filas descritas en Scope.
-- [ ] La rana se controla con flechas **y** con WASD, y cada pulsación la mueve exactamente una celda.
-- [ ] Montada sobre un tronco o una tortuga, la rana se desplaza junto con la plataforma y no se desalinea de la grilla al volver a saltar.
-- [ ] Ser atropellada en cualquiera de los 5 carriles de carretera descuenta una vida.
-- [ ] Caer al agua en un carril de río sin plataforma bajo la rana descuenta una vida.
-- [ ] Quedarse sobre una tortuga que se sumerge descuenta una vida.
-- [ ] Ser arrastrada fuera del borde de la pantalla montada en una plataforma descuenta una vida.
-- [ ] Saltar a una casa ya ocupada o al matorral entre casas descuenta una vida.
-- [ ] Agotar el temporizador de 30 segundos descuenta una vida y reinicia el temporizador.
-- [ ] Llegar a una casa libre suma 50 puntos más 10 por cada medio segundo sin usar del temporizador.
-- [ ] Ocupar las 5 casas suma 1000 puntos, sube el nivel, vacía las casas y aumenta las velocidades.
-- [ ] El HUD muestra 3 vidas al empezar y llega a 0 tras la tercera muerte, momento en el que aparece el modal de fin de partida.
-- [ ] El modal de fin de partida aparece sin tabla de top-5 (esta spec no tiene persistencia) y "JUGAR DE NUEVO" reinicia el motor a su estado inicial.
-- [ ] `/games/ranaria` ya no existe y ningún archivo del repo sigue referenciando el id `ranaria`.
-- [ ] `npm run build` termina sin errores y `npm run lint` no introduce errores nuevos.
+- [x] `/games/frogger/play` muestra el Frogger real dentro del `crt-screen`, en un canvas de 800×650 con las 13 filas descritas en Scope. (Verificado: el SSR sirve `<canvas width="800" height="650">` dentro de `crt-screen fit-canvas`.)
+- [x] La rana se controla con flechas **y** con WASD, y cada pulsación la mueve exactamente una celda.
+- [x] Montada sobre un tronco o una tortuga, la rana se desplaza junto con la plataforma y no se desalinea de la grilla al volver a saltar. (El salto horizontal parte de `Math.round(x / CELL_PX)`, así que siempre re-alinea.)
+- [x] Ser atropellada en cualquiera de los 5 carriles de carretera descuenta una vida.
+- [x] Caer al agua en un carril de río sin plataforma bajo la rana descuenta una vida.
+- [x] Quedarse sobre una tortuga que se sumerge descuenta una vida.
+- [x] Ser arrastrada fuera del borde de la pantalla montada en una plataforma descuenta una vida.
+- [x] Saltar a una casa ya ocupada o al matorral entre casas descuenta una vida.
+- [x] Agotar el temporizador de 30 segundos descuenta una vida y reinicia el temporizador.
+- [x] Llegar a una casa libre suma 50 puntos más 10 por cada medio segundo sin usar del temporizador.
+- [x] Ocupar las 5 casas suma 1000 puntos, sube el nivel, vacía las casas y aumenta las velocidades. (Las velocidades las deriva `speedFactor()` del nivel: +15% por nivel.)
+- [x] El HUD muestra 3 vidas al empezar y llega a 0 tras la tercera muerte, momento en el que aparece el modal de fin de partida.
+- [x] El modal de fin de partida aparece sin tabla de top-5 (esta spec no tiene persistencia) y "JUGAR DE NUEVO" reinicia el motor a su estado inicial.
+- [x] `/games/ranaria` ya no existe y ningún archivo del repo sigue referenciando el id `ranaria`. (Verificado: `/games/ranaria` responde 404 y `/games/frogger` 200. Sobreviven dos menciones que **no** son el id: las specs históricas 05/06/07/08, que describen el estado del catálogo cuando se escribieron, y el nombre decorativo `g: "Ranaria"` del `TICKER` mock de `components/home.tsx`, que conserva los nombres viejos de todos los juegos renombrados — `Caída`, `Rocas`, `Bloque Buster`, `Serpentina` — siguiendo el precedente de las specs 06 y 08.)
+- [x] `npm run build` termina sin errores y `npm run lint` no introduce errores nuevos. (Build limpio; lint queda en 98 errores preexistentes de `no-multiple-empty-lines`, idéntico a la rama base, más un warning gemelo del de `snake/engine.ts:117`.)
 
 ## Decisions
 

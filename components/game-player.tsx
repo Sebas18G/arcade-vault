@@ -46,8 +46,13 @@ import {
   getSnakeSkin,
   setSnakeSkin,
 } from "@/components/games/snake/leaderboard";
-// Frogger todavía no tiene leaderboard propio: llega en la spec 10.
+// Frogger todavía no tiene leaderboard propio: llega en la spec 10. Su
+// leaderboard.ts hoy solo guarda la preferencia de skin en localStorage.
 import { FroggerCanvas } from "@/components/games/frogger/frogger-canvas";
+import {
+  getFroggerSkin,
+  setFroggerSkin,
+} from "@/components/games/frogger/leaderboard";
 const LIVES = 3;
 const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
   { value: "retro", label: "Retro" },
@@ -64,6 +69,7 @@ const SKINS_BY_GAME: Record<string, SkinOption[]> = {
   tetris: TETRIS_SKINS,
   asteroids: GAME_SKINS,
   snake: GAME_SKINS,
+  frogger: GAME_SKINS,
 };
 // Lectura/escritura de la preferencia, delegada al leaderboard.ts de cada juego.
 // Ambas claves son "<gameId>-skin" ("tetris-skin" es la que Tetris ya usaba,
@@ -83,6 +89,10 @@ const SKIN_STORAGE: Record<
   snake: {
     read: getSnakeSkin,
     write: (value) => setSnakeSkin(value as GameSkin),
+  },
+  frogger: {
+    read: getFroggerSkin,
+    write: (value) => setFroggerSkin(value as GameSkin),
   },
 };
 function GameOverModal({
@@ -516,6 +526,7 @@ export function GamePlayer({ game }: { game: Game }) {
             <FroggerCanvas
               ref={canvasRef}
               paused={paused || over}
+              skin={skin as GameSkin}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
