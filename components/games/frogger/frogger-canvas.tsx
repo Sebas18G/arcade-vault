@@ -1,17 +1,18 @@
 "use client";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import {
-  SnakeEngine,
-  SNAKE_WIDTH,
-  SNAKE_HEIGHT,
-  type Direction,
+  FroggerEngine,
+  FROGGER_WIDTH,
+  FROGGER_HEIGHT,
+  type FroggerDirection,
 } from "./engine";
 import type {
   GameCanvasHandle,
   GameCanvasProps,
-  SnakeGameOverResult,
+  FroggerGameOverResult,
 } from "@/components/games/shared/types";
-function directionFromKey(key: string): Direction | null {
+// Flechas y WASD en simultáneo, siguiendo el precedente de Snake (spec 08).
+function directionFromKey(key: string): FroggerDirection | null {
   switch (key) {
     case "ArrowUp":
     case "w":
@@ -33,10 +34,10 @@ function directionFromKey(key: string): Direction | null {
       return null;
   }
 }
-export const SnakeCanvas = forwardRef<
+export const FroggerCanvas = forwardRef<
   GameCanvasHandle,
-  GameCanvasProps<SnakeGameOverResult>
->(function SnakeCanvas(
+  GameCanvasProps<FroggerGameOverResult>
+>(function FroggerCanvas(
   {
     paused,
     skin = "classic",
@@ -48,7 +49,7 @@ export const SnakeCanvas = forwardRef<
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<SnakeEngine | null>(null);
+  const engineRef = useRef<FroggerEngine | null>(null);
   const callbacksRef = useRef({
     onScoreChange,
     onLivesChange,
@@ -67,7 +68,7 @@ export const SnakeCanvas = forwardRef<
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const engine = new SnakeEngine({
+    const engine = new FroggerEngine({
       onScoreChange: (score) => callbacksRef.current.onScoreChange(score),
       onLivesChange: (lives) => callbacksRef.current.onLivesChange(lives),
       onLevelChange: (level) => callbacksRef.current.onLevelChange(level),
@@ -117,5 +118,7 @@ export const SnakeCanvas = forwardRef<
   useImperativeHandle(ref, () => ({
     restart: () => engineRef.current?.restart(),
   }));
-  return <canvas ref={canvasRef} width={SNAKE_WIDTH} height={SNAKE_HEIGHT} />;
+  return (
+    <canvas ref={canvasRef} width={FROGGER_WIDTH} height={FROGGER_HEIGHT} />
+  );
 });

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type {
-  GameOverResult,
+  FroggerGameOverResult,
   LeaderboardEntry,
 } from "@/components/games/shared/types";
 import {
@@ -10,12 +10,12 @@ import {
 } from "@/components/games/shared/skins";
 import { requireUserId } from "@/components/games/shared/session";
 // Preferencia de UI: vive solo en localStorage, nunca en Supabase.
-const SKIN_KEY = "snake-skin";
+const SKIN_KEY = "frogger-skin";
 const MAX_ENTRIES = 5;
-export async function getSnakeLeaderboard(): Promise<LeaderboardEntry[]> {
+export async function getFroggerLeaderboard(): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("snake_scores")
+    .from("frogger_scores")
     .select("id, player_name, score, level")
     .order("score", { ascending: false })
     .limit(MAX_ENTRIES);
@@ -27,22 +27,24 @@ export async function getSnakeLeaderboard(): Promise<LeaderboardEntry[]> {
     level: row.level,
   }));
 }
-export async function addSnakeScore(
+export async function addFroggerScore(
   name: string,
-  result: GameOverResult,
+  result: FroggerGameOverResult,
 ): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
   const userId = await requireUserId(supabase);
-  const { error } = await supabase.from("snake_scores").insert({
+  const { error } = await supabase.from("frogger_scores").insert({
     player_name: name,
     score: result.score,
     level: result.level,
+    frogs_home: result.frogsHome,
+    time_bonus: result.timeBonus,
     user_id: userId,
   });
   if (error) throw error;
-  return getSnakeLeaderboard();
+  return getFroggerLeaderboard();
 }
-export function getSnakeSkin(): GameSkin {
+export function getFroggerSkin(): GameSkin {
   try {
     const stored = localStorage.getItem(SKIN_KEY);
     return isGameSkin(stored) ? stored : DEFAULT_GAME_SKIN;
@@ -50,7 +52,7 @@ export function getSnakeSkin(): GameSkin {
     return DEFAULT_GAME_SKIN;
   }
 }
-export function setSnakeSkin(skin: GameSkin): void {
+export function setFroggerSkin(skin: GameSkin): void {
   try {
     localStorage.setItem(SKIN_KEY, skin);
   } catch {

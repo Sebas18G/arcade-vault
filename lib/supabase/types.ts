@@ -1,4 +1,9 @@
 export type GameRow = { id: string; title: string; created_at: string };
+export type ProfileRow = {
+  id: string;
+  username: string;
+  created_at: string;
+};
 export type AsteroidsScoreRow = {
   id: string;
   player_name: string;
@@ -32,6 +37,16 @@ export type SnakeScoreRow = {
   player_name: string;
   score: number;
   level: number;
+  user_id: string | null;
+  created_at: string;
+};
+export type FroggerScoreRow = {
+  id: string;
+  player_name: string;
+  score: number;
+  level: number;
+  frogs_home: number;
+  time_bonus: number;
   user_id: string | null;
   created_at: string;
 };

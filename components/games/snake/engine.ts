@@ -1,4 +1,6 @@
 import type { GameOverResult } from "@/components/games/shared/types";
+import type { GameSkin } from "@/components/games/shared/skins";
+import { SNAKE_SKIN_PALETTES, type SnakePalette } from "./skins";
 import {
   FRUITS,
   FRUIT_ATLAS_SRC,
@@ -35,10 +37,8 @@ const BASE_MOVE_INTERVAL_MS = 220;
 const MOVE_INTERVAL_STEP_MS = 12;
 const MIN_MOVE_INTERVAL_MS = 45; // piso técnico interno, no un "nivel máximo" visible
 const MAX_UPDATE_STEPS = 8; // evita explosión de pasos si el tab estuvo en background
-const SNAKE_COLOR = "green";
-const SNAKE_HEAD_COLOR = "#0f0";
-const BG_COLOR = "#0a0a0a";
-const GRID_LINE_COLOR = "rgba(255, 255, 255, 0.05)";
+// Los colores ya no viven aquí: entran por `setSkin()` desde ./skins.
+// El motor nunca lee `document`, `window` ni `localStorage`.
 let fruitImg: HTMLImageElement | null = null;
 let fruitImgLoaded = false;
 let fruitImgLoading: Promise<void> | null = null;
@@ -78,10 +78,19 @@ export class SnakeEngine {
   private pendingDirection: Direction = INITIAL_DIRECTION;
   private fruit: { pos: GridPoint; name: string } | null = null;
   private moveAccumulator = 0;
+  private skin: GameSkin = "classic";
+  private palette: SnakePalette = SNAKE_SKIN_PALETTES.classic;
   constructor(callbacks: SnakeEngineCallbacks) {
     this.callbacks = callbacks;
     loadFruitAtlas();
     this.restart();
+  }
+  setSkin(skin: GameSkin) {
+    this.skin = skin;
+    this.palette = SNAKE_SKIN_PALETTES[skin] ?? SNAKE_SKIN_PALETTES.classic;
+  }
+  getSkin(): GameSkin {
+    return this.skin;
   }
   restart() {
     this.score = 0;
@@ -189,9 +198,11 @@ export class SnakeEngine {
       }
     }
   }
-  private drawGrid(ctx: CanvasRenderingContext2D) {
-    ctx.strokeStyle = GRID_LINE_COLOR;
-    ctx.lineWidth = 1;
+  /** Retícula completa: el trazado original, con color y grosor de la paleta. */
+  private drawGridLines(ctx: CanvasRenderingContext2D) {
+    const { color, lineWidth } = this.palette.grid;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
     for (let i = 0; i <= GRID_SIZE; i++) {
       ctx.beginPath();
       ctx.moveTo(i * CELL_PX, 0);
@@ -203,12 +214,55 @@ export class SnakeEngine {
       ctx.stroke();
     }
   }
+  /** Trama de puntos en las intersecciones: misma información, mucha menos tinta. */
+  private drawGridDots(ctx: CanvasRenderingContext2D) {
+    const { color, dotSize } = this.palette.grid;
+    if (dotSize <= 0) return;
+    const half = dotSize / 2;
+    ctx.fillStyle = color;
+    for (let x = 0; x <= GRID_SIZE; x++) {
+      for (let y = 0; y <= GRID_SIZE; y++) {
+        ctx.fillRect(x * CELL_PX - half, y * CELL_PX - half, dotSize, dotSize);
+      }
+    }
+  }
+  private drawGrid(ctx: CanvasRenderingContext2D) {
+    if (this.palette.grid.style === "dots") this.drawGridDots(ctx);
+    else this.drawGridLines(ctx);
+  }
+  /** Marco del tablero: en classic no existe (`border: null`) y no se dibuja nada. */
+  private drawBoardBorder(ctx: CanvasRenderingContext2D) {
+    const { border, borderWidth, borderGlow } = this.palette.board;
+    if (!border || borderWidth <= 0) return;
+    ctx.save();
+    ctx.strokeStyle = border;
+    ctx.lineWidth = borderWidth;
+    if (borderGlow > 0) {
+      ctx.shadowColor = border;
+      ctx.shadowBlur = borderGlow;
+    }
+    const inset = borderWidth / 2;
+    ctx.strokeRect(
+      inset,
+      inset,
+      SNAKE_WIDTH - borderWidth,
+      SNAKE_HEIGHT - borderWidth,
+    );
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
   private drawFruit(ctx: CanvasRenderingContext2D) {
     if (!this.fruit) return;
     const { pos, name } = this.fruit;
     const sprite: FruitSprite | undefined = FRUITS[name];
     const dx = pos.x * CELL_PX;
     const dy = pos.y * CELL_PX;
+    const { fruitGlow, fruitGlowColor, fruitFallback } = this.palette;
+    ctx.save();
+    if (fruitGlow > 0) {
+      ctx.shadowColor = fruitGlowColor;
+      ctx.shadowBlur = fruitGlow;
+    }
     if (sprite && fruitImgLoaded && fruitImg) {
       ctx.drawImage(
         fruitImg,
@@ -222,13 +276,23 @@ export class SnakeEngine {
         CELL_PX,
       );
     } else {
-      ctx.fillStyle = "red";
+      ctx.fillStyle = fruitFallback;
       ctx.fillRect(dx + 6, dy + 6, CELL_PX - 12, CELL_PX - 12);
     }
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
   private drawSnake(ctx: CanvasRenderingContext2D) {
+    const { snakeHead, snakeBody, snakeGlow } = this.palette;
+    ctx.save();
     this.snake.forEach((seg, i) => {
-      ctx.fillStyle = i === 0 ? SNAKE_HEAD_COLOR : SNAKE_COLOR;
+      const color = i === 0 ? snakeHead : snakeBody;
+      ctx.fillStyle = color;
+      if (snakeGlow > 0) {
+        ctx.shadowColor = color;
+        // La cabeza brilla más que el cuerpo: nunca se confunden.
+        ctx.shadowBlur = i === 0 ? snakeGlow * 1.5 : snakeGlow;
+      }
       ctx.fillRect(
         seg.x * CELL_PX + 1,
         seg.y * CELL_PX + 1,
@@ -236,24 +300,28 @@ export class SnakeEngine {
         CELL_PX - 2,
       );
     });
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
   private drawHUD(ctx: CanvasRenderingContext2D) {
+    const { hudText, hudShadow, hudShadowBlur } = this.palette;
     ctx.font = 'bold 22px "Courier New", monospace';
     ctx.textBaseline = "top";
-    ctx.shadowColor = "rgba(255, 255, 255, 0.5)";
-    ctx.shadowBlur = 6;
-    ctx.fillStyle = "#fff";
+    ctx.shadowColor = hudShadow;
+    ctx.shadowBlur = hudShadowBlur;
+    ctx.fillStyle = hudText;
     ctx.textAlign = "left";
     ctx.fillText(`PUNTAJE ${this.score}`, 10, 10);
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = hudText;
     ctx.textAlign = "right";
     ctx.fillText(`NIVEL ${this.level}`, SNAKE_WIDTH - 10, 10);
     ctx.shadowBlur = 0;
   }
   draw(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = BG_COLOR;
+    ctx.fillStyle = this.palette.background;
     ctx.fillRect(0, 0, SNAKE_WIDTH, SNAKE_HEIGHT);
     this.drawGrid(ctx);
+    this.drawBoardBorder(ctx);
     this.drawFruit(ctx);
     this.drawSnake(ctx);
     this.drawHUD(ctx);

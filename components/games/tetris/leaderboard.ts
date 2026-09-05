@@ -4,6 +4,7 @@ import type {
   TetrisGameOverResult,
 } from "@/components/games/shared/types";
 import type { TetrisSkin } from "@/components/games/tetris/engine";
+import { requireUserId } from "@/components/games/shared/session";
 const BEST_STATS_KEY = "tetris-best-stats";
 const THEME_KEY = "tetris-theme";
 const SKIN_KEY = "tetris-skin";
@@ -39,12 +40,14 @@ export async function addTetrisScore(
   result: TetrisGameOverResult,
 ): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
+  const userId = await requireUserId(supabase);
   const { error } = await supabase.from("tetris_scores").insert({
     player_name: name,
     score: result.score,
     level: result.level,
     lines: result.lines,
     best_combo: result.bestCombo,
+    user_id: userId,
   });
   if (error) throw error;
   return getTetrisLeaderboard();

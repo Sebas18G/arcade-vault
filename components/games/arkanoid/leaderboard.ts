@@ -3,6 +3,7 @@ import type {
   GameOverResult,
   LeaderboardEntry,
 } from "@/components/games/shared/types";
+import { requireUserId } from "@/components/games/shared/session";
 const MAX_ENTRIES = 5;
 export async function getArkanoidLeaderboard(): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
@@ -24,10 +25,12 @@ export async function addArkanoidScore(
   result: GameOverResult,
 ): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
+  const userId = await requireUserId(supabase);
   const { error } = await supabase.from("arkanoid_scores").insert({
     player_name: name,
     score: result.score,
     level: result.level,
+    user_id: userId,
   });
   if (error) throw error;
   return getArkanoidLeaderboard();

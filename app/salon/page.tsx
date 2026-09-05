@@ -9,6 +9,7 @@ const SCORE_TABLE: Record<string, string> = {
   tetris: "tetris_scores",
   arkanoid: "arkanoid_scores",
   snake: "snake_scores",
+  frogger: "frogger_scores",
 };
 type SalonRow = { id: string; name: string; score: number; date: string };
 function formatDate(iso: string): string {
@@ -89,7 +90,7 @@ export default function HallOfFamePage() {
       const { data } = await supabase
         .from(table)
         .select("id, player_name, score, created_at")
-        .eq("player_name", user.name)
+        .eq("user_id", user.id)
         .order("score", { ascending: false })
         .limit(1);
       if (!cancelled) setYouRow(mapRows(data)[0] ?? null);

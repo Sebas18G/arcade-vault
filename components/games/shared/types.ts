@@ -1,3 +1,4 @@
+import type { GameSkin } from "@/components/games/shared/skins";
 export type GameOverResult = {
   score: number;
   level: number;
@@ -11,6 +12,12 @@ export type TetrisGameOverResult = GameOverResult & {
   bestCombo: number;
 };
 export type SnakeGameOverResult = GameOverResult; // sin stats extra, igual que Arkanoid
+export type FroggerGameOverResult = GameOverResult & {
+  /** Ranas totales llevadas a casa en la partida. */
+  frogsHome: number;
+  /** Puntos acumulados por tiempo sin usar del temporizador. */
+  timeBonus: number;
+};
 export type LeaderboardEntry = {
   id: string;
   name: string;
@@ -20,6 +27,8 @@ export type LeaderboardEntry = {
 };
 export type GameCanvasProps<TResult extends GameOverResult = GameOverResult> = {
   paused: boolean;
+  /** Opcional: los canvas todavía sin skins (arkanoid) lo ignoran. */
+  skin?: GameSkin;
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
   onLevelChange: (level: number) => void;

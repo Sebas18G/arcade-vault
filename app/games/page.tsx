@@ -5,6 +5,7 @@ const SCORE_TABLE: Record<string, string> = {
   tetris: "tetris_scores",
   arkanoid: "arkanoid_scores",
   snake: "snake_scores",
+  frogger: "frogger_scores",
 };
 async function fetchRealBests(): Promise<Record<string, number>> {
   const supabase = await createClient();

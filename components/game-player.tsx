@@ -2,22 +2,22 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Game } from "@/app/data/games";
-import { useAuth } from "@/lib/auth-context";
 import { addScore } from "@/lib/storage";
-import type { UserSession } from "@/lib/storage";
 import type {
   AsteroidsGameOverResult,
+  FroggerGameOverResult,
   GameCanvasHandle,
   GameOverResult,
   LeaderboardEntry,
   TetrisGameOverResult,
 } from "@/components/games/shared/types";
+import { GAME_SKINS, type GameSkin } from "@/components/games/shared/skins";
 import { AsteroidsCanvas } from "@/components/games/asteroids/asteroids-canvas";
 import {
   addAsteroidsScore,
   getAsteroidsLeaderboard,
-  getSavedPlayerName,
-  setSavedPlayerName,
+  getAsteroidsSkin,
+  setAsteroidsSkin,
 } from "@/components/games/asteroids/leaderboard";
 import { TetrisCanvas } from "@/components/games/tetris/tetris-canvas";
 import type { TetrisSkin } from "@/components/games/tetris/engine";
@@ -39,7 +39,16 @@ import { SnakeCanvas } from "@/components/games/snake/snake-canvas";
 import {
   addSnakeScore,
   getSnakeLeaderboard,
+  getSnakeSkin,
+  setSnakeSkin,
 } from "@/components/games/snake/leaderboard";
+import { FroggerCanvas } from "@/components/games/frogger/frogger-canvas";
+import {
+  addFroggerScore,
+  getFroggerLeaderboard,
+  getFroggerSkin,
+  setFroggerSkin,
+} from "@/components/games/frogger/leaderboard";
 const LIVES = 3;
 const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
   { value: "retro", label: "Retro" },
@@ -47,35 +56,71 @@ const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
   { value: "pastel", label: "Pastel" },
   { value: "pixel", label: "Pixel Art" },
 ];
+type SkinOption = { value: string; label: string };
+// Registro de skins por juego: el botón "SKIN" del HUD se renderiza para
+// cualquier juego presente aquí. Tetris conserva sus 4 skins propias; los
+// juegos migrados al contrato compartido usan las 3 de GAME_SKINS.
+// (arkanoid todavía no tiene skins: por eso no figura).
+const SKINS_BY_GAME: Record<string, SkinOption[]> = {
+  tetris: TETRIS_SKINS,
+  asteroids: GAME_SKINS,
+  snake: GAME_SKINS,
+  frogger: GAME_SKINS,
+};
+// Lectura/escritura de la preferencia, delegada al leaderboard.ts de cada juego.
+// Ambas claves son "<gameId>-skin" ("tetris-skin" es la que Tetris ya usaba,
+// así que la preferencia guardada de sus jugadores sobrevive intacta).
+const SKIN_STORAGE: Record<
+  string,
+  { read: () => string; write: (value: string) => void }
+> = {
+  tetris: {
+    read: getTetrisSkin,
+    write: (value) => setTetrisSkin(value as TetrisSkin),
+  },
+  asteroids: {
+    read: getAsteroidsSkin,
+    write: (value) => setAsteroidsSkin(value as GameSkin),
+  },
+  snake: {
+    read: getSnakeSkin,
+    write: (value) => setSnakeSkin(value as GameSkin),
+  },
+  frogger: {
+    read: getFroggerSkin,
+    write: (value) => setFroggerSkin(value as GameSkin),
+  },
+};
 function GameOverModal({
   game,
   score,
   level,
-  user,
+  name,
   leaderboard,
-  defaultName,
   onRestart,
 }: {
   game: Game;
   score: number;
   level?: number;
-  user: UserSession;
+  name: string;
   leaderboard?: {
     entries: LeaderboardEntry[];
     loading?: boolean;
     fetchError?: string | null;
     onSaveName: (name: string) => void | Promise<void>;
   };
-  defaultName?: string;
   onRestart: () => void;
 }) {
-  const [name, setName] = useState(
-    () => defaultName ?? user?.name ?? "INVITADO",
-  );
+  // El alias del perfil es la única firma posible de un puntaje: ya no hay input
+  // libre (RLS exige user_id = auth.uid(), y player_name viene de profiles).
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const saveScore = async () => {
+    if (!name) {
+      setSaveError("Tu sesión expiró. Vuelve a iniciar sesión para guardar.");
+      return;
+    }
     if (leaderboard) {
       setSaving(true);
       setSaveError(null);
@@ -152,18 +197,22 @@ function GameOverModal({
           )}
         {!saved ? (
           <div className="input-row">
-            <input
-              value={name}
-              onChange={(e) =>
-                setName(e.target.value.toUpperCase().slice(0, 10))
-              }
-              placeholder="TUS INICIALES"
-              disabled={saving}
-            />
+            <div
+              className="pixel neon-cyan"
+              style={{
+                flex: 1,
+                alignSelf: "center",
+                fontSize: 13,
+                letterSpacing: "0.12em",
+                textAlign: "center",
+              }}
+            >
+              {name || "SIN SESIÓN"}
+            </div>
             <button
               className="btn yellow"
               onClick={saveScore}
-              disabled={saving}
+              disabled={saving || !name}
             >
               {saving ? "GUARDANDO..." : "GUARDAR PUNTUACIÓN"}
             </button>
@@ -191,13 +240,23 @@ function GameOverModal({
     </div>
   );
 }
-export function GamePlayer({ game }: { game: Game }) {
-  const { user } = useAuth();
+// playerName llega resuelto desde el Server Component de la ruta (requirePlayer):
+// el HUD y el modal muestran el alias desde el primer render, sin esperar a que
+// el contexto de auth hidrate en el cliente.
+export function GamePlayer({
+  game,
+  playerName,
+}: {
+  game: Game;
+  playerName: string;
+}) {
   const isAsteroids = game.id === "asteroids";
   const isTetris = game.id === "tetris";
   const isArkanoid = game.id === "arkanoid";
   const isSnake = game.id === "snake";
-  const isPortedGame = isAsteroids || isTetris || isArkanoid || isSnake;
+  const isFrogger = game.id === "frogger";
+  const isPortedGame =
+    isAsteroids || isTetris || isArkanoid || isSnake || isFrogger;
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(LIVES);
   const [engineLevel, setEngineLevel] = useState(1);
@@ -212,6 +271,8 @@ export function GamePlayer({ game }: { game: Game }) {
     null,
   );
   const [snakeResult, setSnakeResult] = useState<GameOverResult | null>(null);
+  const [froggerResult, setFroggerResult] =
+    useState<FroggerGameOverResult | null>(null);
   const [leaderboardEntries, setLeaderboardEntries] = useState<
     LeaderboardEntry[]
   >([]);
@@ -222,22 +283,26 @@ export function GamePlayer({ game }: { game: Game }) {
   // Arrancan en el default "seguro para SSR" (el servidor no tiene localStorage)
   // y se corrigen en un useEffect post-hidratación para no producir un
   // hydration mismatch cuando el usuario ya tenía guardada otra preferencia.
-  const [tetrisSkin, setTetrisSkinState] = useState<TetrisSkin>("retro");
+  const skinOptions = SKINS_BY_GAME[game.id];
+  const [skin, setSkinState] = useState<string>(
+    () => skinOptions?.[0]?.value ?? "classic",
+  );
   const [tetrisTheme, setTetrisThemeState] = useState<"dark" | "light">("dark");
   const canvasRef = useRef<GameCanvasHandle>(null);
   const level = isPortedGame ? engineLevel : Math.floor(score / 2500) + 1;
   useEffect(() => {
-    if (!isTetris) return;
+    const storage = SKIN_STORAGE[game.id];
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTetrisSkinState(getTetrisSkin());
-    setTetrisThemeState(getTetrisTheme());
+    if (storage) setSkinState(storage.read());
+    if (isTetris) setTetrisThemeState(getTetrisTheme());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const cycleTetrisSkin = () => {
-    setTetrisSkinState((prev) => {
-      const idx = TETRIS_SKINS.findIndex((s) => s.value === prev);
-      const next = TETRIS_SKINS[(idx + 1) % TETRIS_SKINS.length].value;
-      setTetrisSkin(next);
+  const cycleSkin = () => {
+    if (!skinOptions) return;
+    setSkinState((prev) => {
+      const idx = skinOptions.findIndex((s) => s.value === prev);
+      const next = skinOptions[(idx + 1) % skinOptions.length].value;
+      SKIN_STORAGE[game.id]?.write(next);
       return next;
     });
   };
@@ -266,6 +331,7 @@ export function GamePlayer({ game }: { game: Game }) {
     setTetrisResult(null);
     setArkanoidResult(null);
     setSnakeResult(null);
+    setFroggerResult(null);
     setLeaderboardEntries([]);
     setLeaderboardLoading(false);
     setLeaderboardFetchError(null);
@@ -332,6 +398,21 @@ export function GamePlayer({ game }: { game: Game }) {
     setOver(true);
     loadSnakeLeaderboard();
   };
+  const loadFroggerLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardFetchError(null);
+    getFroggerLeaderboard()
+      .then(setLeaderboardEntries)
+      .catch(() =>
+        setLeaderboardFetchError("No se pudieron cargar las puntuaciones."),
+      )
+      .finally(() => setLeaderboardLoading(false));
+  };
+  const handleFroggerGameOver = (result: FroggerGameOverResult) => {
+    setFroggerResult(result);
+    setOver(true);
+    loadFroggerLeaderboard();
+  };
   const handleForceEnd = () => {
     if (isAsteroids) {
       setAsteroidsResult({
@@ -354,6 +435,15 @@ export function GamePlayer({ game }: { game: Game }) {
       setSnakeResult({ score, level: engineLevel });
       loadSnakeLeaderboard();
     }
+    if (isFrogger) {
+      setFroggerResult({
+        score,
+        level: engineLevel,
+        frogsHome: 0,
+        timeBonus: 0,
+      });
+      loadFroggerLeaderboard();
+    }
     setOver(true);
   };
   return (
@@ -363,7 +453,7 @@ export function GamePlayer({ game }: { game: Game }) {
           <div className="hud-stat">
             <div className="l">Jugador</div>
             <div className="v" style={{ color: "var(--ink)" }}>
-              {user?.name ?? "INVITADO"}
+              {playerName}
             </div>
           </div>
           <div className="hud-stat">
@@ -378,22 +468,24 @@ export function GamePlayer({ game }: { game: Game }) {
             <div className="l">Nivel</div>
             <div className="v">{String(level).padStart(2, "0")}</div>
           </div>
+          {skinOptions && (
+            <div className="hud-stat">
+              <div className="l">Skin</div>
+              <button type="button" className="v" onClick={cycleSkin}>
+                {skinOptions.find((s) => s.value === skin)?.label ??
+                  skinOptions[0].label}
+              </button>
+            </div>
+          )}
+          {/* "TEMA" sigue siendo exclusivo de Tetris: es el único con CSS
+              Module claro/oscuro. */}
           {isTetris && (
-            <>
-              <div className="hud-stat">
-                <div className="l">Skin</div>
-                <button type="button" className="v" onClick={cycleTetrisSkin}>
-                  {TETRIS_SKINS.find((s) => s.value === tetrisSkin)?.label ??
-                    "Retro"}
-                </button>
-              </div>
-              <div className="hud-stat">
-                <div className="l">Tema</div>
-                <button type="button" className="v" onClick={toggleTetrisTheme}>
-                  {tetrisTheme === "dark" ? "OSCURO" : "CLARO"}
-                </button>
-              </div>
-            </>
+            <div className="hud-stat">
+              <div className="l">Tema</div>
+              <button type="button" className="v" onClick={toggleTetrisTheme}>
+                {tetrisTheme === "dark" ? "OSCURO" : "CLARO"}
+              </button>
+            </div>
           )}
         </div>
         <div className="hud-actions">
@@ -414,6 +506,7 @@ export function GamePlayer({ game }: { game: Game }) {
             <AsteroidsCanvas
               ref={canvasRef}
               paused={paused || over}
+              skin={skin as GameSkin}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
@@ -423,7 +516,7 @@ export function GamePlayer({ game }: { game: Game }) {
             <TetrisCanvas
               ref={canvasRef}
               paused={paused || over}
-              skin={tetrisSkin}
+              skin={skin as TetrisSkin}
               theme={tetrisTheme}
               onScoreChange={setScore}
               onLivesChange={setLives}
@@ -443,10 +536,21 @@ export function GamePlayer({ game }: { game: Game }) {
             <SnakeCanvas
               ref={canvasRef}
               paused={paused || over}
+              skin={skin as GameSkin}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
               onGameOver={handleSnakeGameOver}
+            />
+          ) : isFrogger ? (
+            <FroggerCanvas
+              ref={canvasRef}
+              paused={paused || over}
+              skin={skin as GameSkin}
+              onScoreChange={setScore}
+              onLivesChange={setLives}
+              onLevelChange={setEngineLevel}
+              onGameOver={handleFroggerGameOver}
             />
           ) : (
             <div className="game-arena">
@@ -499,7 +603,9 @@ export function GamePlayer({ game }: { game: Game }) {
                   ? (arkanoidResult?.score ?? score)
                   : isSnake
                     ? (snakeResult?.score ?? score)
-                    : score
+                    : isFrogger
+                      ? (froggerResult?.score ?? score)
+                      : score
           }
           level={
             isAsteroids
@@ -510,14 +616,11 @@ export function GamePlayer({ game }: { game: Game }) {
                   ? (arkanoidResult?.level ?? engineLevel)
                   : isSnake
                     ? (snakeResult?.level ?? engineLevel)
-                    : undefined
+                    : isFrogger
+                      ? (froggerResult?.level ?? engineLevel)
+                      : undefined
           }
-          user={user}
-          defaultName={
-            isAsteroids
-              ? getSavedPlayerName() || user?.name || "INVITADO"
-              : undefined
-          }
+          name={playerName}
           leaderboard={
             isAsteroids
               ? {
@@ -531,7 +634,6 @@ export function GamePlayer({ game }: { game: Game }) {
                       asteroidsDestroyed: 0,
                       bestCombo: 0,
                     };
-                    setSavedPlayerName(name);
                     const entries = await addAsteroidsScore(name, result);
                     setLeaderboardEntries(entries);
                   },
@@ -580,7 +682,23 @@ export function GamePlayer({ game }: { game: Game }) {
                           setLeaderboardEntries(entries);
                         },
                       }
-                    : undefined
+                    : isFrogger
+                      ? {
+                          entries: leaderboardEntries,
+                          loading: leaderboardLoading,
+                          fetchError: leaderboardFetchError,
+                          onSaveName: async (name) => {
+                            const result = froggerResult ?? {
+                              score,
+                              level: engineLevel,
+                              frogsHome: 0,
+                              timeBonus: 0,
+                            };
+                            const entries = await addFroggerScore(name, result);
+                            setLeaderboardEntries(entries);
+                          },
+                        }
+                      : undefined
           }
           onRestart={restart}
         />
