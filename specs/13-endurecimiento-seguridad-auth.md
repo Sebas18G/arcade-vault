@@ -1,6 +1,6 @@
 # SPEC 13 — Endurecimiento de seguridad de la autenticación
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 06, SPEC 08, SPEC 12
 > **Date:** 2026-09-05
 > **Objective:** Cerrar los tres hallazgos de la revisión de seguridad de la spec 12 — suplantación de alias en los leaderboards, `SECURITY DEFINER` con `search_path` mutable, y open redirect en el parámetro `next` — moviendo a la base de datos las garantías que hoy solo sostiene el cliente.
