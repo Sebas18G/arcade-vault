@@ -44,6 +44,14 @@ medias, y volver a ejecutarlo sobre una base ya migrada no rompe nada.
 
 - [ ] El script terminó sin errores
 
+Después, en el SQL Editor, pegar
+[`supabase/prod/mark-baseline-applied.sql`](../supabase/prod/mark-baseline-applied.sql).
+Registra esas 15 migraciones como aplicadas, para que producción y desarrollo
+compartan el mismo punto de partida y las migraciones futuras se apliquen sobre
+una base coherente. Debe devolver 15.
+
+- [ ] Las 15 migraciones quedaron registradas
+
 ## Paso 3 — Verificar
 
 SQL Editor → pegar [`supabase/prod/verify.sql`](../supabase/prod/verify.sql) → Run.
@@ -165,22 +173,22 @@ rollback y pasa a ser una pérdida de datos.
 
 ## Cambios futuros
 
-Mientras no exista una carpeta `supabase/migrations/`, **producción no se
-sincroniza sola**. El flujo para cualquier cambio de esquema es:
+Todo cambio de esquema vive en `supabase/migrations/` y desde ahí se aplica en
+los dos proyectos. El flujo completo está en
+[`supabase/README.md`](../supabase/README.md); en corto, **producción no se
+sincroniza sola**:
 
-1. Aplicarlo en desarrollo como siempre (spec → `/spec-impl` → `apply_migration`).
-2. Reflejar el mismo cambio en `supabase/prod/bootstrap.sql`, manteniéndolo
-   idempotente y en la sección que le corresponde.
-3. Actualizar los conteos esperados de `supabase/prod/verify.sql` si cambió el
-   número de tablas, policies, funciones o triggers.
-4. Aplicar en producción: el `alter`/`create` concreto en el SQL Editor, o el
-   bootstrap completo (es idempotente, pero no borra lo que ya no debería estar —
-   un `drop policy` viejo hay que ejecutarlo a mano).
-
-Cuando el ritmo de cambios haga esto pesado, la salida natural es migrar al
-Supabase CLI: `supabase link` + `supabase db push` contra cada proyecto, con las
-migraciones versionadas en el repo. Este archivo y `bootstrap.sql` serían
-entonces el punto de partida de la migración inicial.
+1. Ver qué tiene producción:
+   `select version, name from supabase_migrations.schema_migrations order by version;`
+2. Ejecutar en el SQL Editor, en orden, cada archivo de `supabase/migrations/`
+   posterior a esa última versión.
+3. Registrar cada uno:
+   ```sql
+   insert into supabase_migrations.schema_migrations (version, name, statements)
+   values ('<version>', '<nombre>', '{}');
+   ```
+4. Correr `verify.sql` y actualizar sus conteos esperados si el cambio agregó
+   tablas, policies, funciones o triggers.
 
 ## Endurecimiento opcional
 
