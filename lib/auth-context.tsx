@@ -24,31 +24,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
   useEffect(() => {
     let cancelled = false;
+    let resolvedId: string | null = null;
     // Un usuario autenticado sin fila en profiles es un estado válido (registro
     // a medias u OAuth recién estrenado): /auth/alias es quien lo resuelve.
-    async function resolve(userId: string | undefined) {
-      if (!userId) {
-        if (!cancelled) setUser(null);
-        return;
-      }
-      const { data } = await supabase
+    async function loadProfile(userId: string) {
+      const { data, error } = await supabase
         .from("profiles")
         .select("username")
         .eq("id", userId)
         .maybeSingle();
       if (cancelled) return;
+      if (error) {
+        console.error("[auth] no se pudo leer el perfil:", error);
+        setUser(null);
+        return;
+      }
       setUser(data ? { id: userId, name: data.username } : null);
+    }
+    function handleSession(userId: string | undefined) {
+      const id = userId ?? null;
+      if (id === resolvedId) return;
+      resolvedId = id;
+      if (!id) {
+        setUser(null);
+        return;
+      }
+      // El callback de onAuthStateChange corre dentro del lock de auth de
+      // supabase-js: consultar la base ahí dentro se queda esperando ese mismo
+      // lock y la promesa nunca resuelve (el usuario quedaba en null pese a
+      // tener sesión). Por eso la lectura del perfil se difiere fuera del lock.
+      setTimeout(() => {
+        if (!cancelled) loadProfile(id);
+      }, 0);
     }
     supabase.auth
       .getSession()
-      .then(({ data }) => resolve(data.session?.user.id))
+      .then(({ data }) => handleSession(data.session?.user.id))
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      resolve(session?.user.id);
+      handleSession(session?.user.id);
     });
     return () => {
       cancelled = true;

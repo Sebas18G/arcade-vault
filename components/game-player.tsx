@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Game } from "@/app/data/games";
-import { useAuth, type UserSession } from "@/lib/auth-context";
 import { addScore } from "@/lib/storage";
 import type {
   AsteroidsGameOverResult,
@@ -96,14 +95,14 @@ function GameOverModal({
   game,
   score,
   level,
-  user,
+  name,
   leaderboard,
   onRestart,
 }: {
   game: Game;
   score: number;
   level?: number;
-  user: UserSession;
+  name: string;
   leaderboard?: {
     entries: LeaderboardEntry[];
     loading?: boolean;
@@ -114,7 +113,6 @@ function GameOverModal({
 }) {
   // El alias del perfil es la única firma posible de un puntaje: ya no hay input
   // libre (RLS exige user_id = auth.uid(), y player_name viene de profiles).
-  const name = user?.name ?? "";
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -242,8 +240,16 @@ function GameOverModal({
     </div>
   );
 }
-export function GamePlayer({ game }: { game: Game }) {
-  const { user } = useAuth();
+// playerName llega resuelto desde el Server Component de la ruta (requirePlayer):
+// el HUD y el modal muestran el alias desde el primer render, sin esperar a que
+// el contexto de auth hidrate en el cliente.
+export function GamePlayer({
+  game,
+  playerName,
+}: {
+  game: Game;
+  playerName: string;
+}) {
   const isAsteroids = game.id === "asteroids";
   const isTetris = game.id === "tetris";
   const isArkanoid = game.id === "arkanoid";
@@ -447,7 +453,7 @@ export function GamePlayer({ game }: { game: Game }) {
           <div className="hud-stat">
             <div className="l">Jugador</div>
             <div className="v" style={{ color: "var(--ink)" }}>
-              {user?.name ?? "..."}
+              {playerName}
             </div>
           </div>
           <div className="hud-stat">
@@ -614,7 +620,7 @@ export function GamePlayer({ game }: { game: Game }) {
                       ? (froggerResult?.level ?? engineLevel)
                       : undefined
           }
-          user={user}
+          name={playerName}
           leaderboard={
             isAsteroids
               ? {
