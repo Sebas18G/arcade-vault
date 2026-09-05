@@ -35,6 +35,16 @@ export type SnakeScoreRow = {
   user_id: string | null;
   created_at: string;
 };
+export type FroggerScoreRow = {
+  id: string;
+  player_name: string;
+  score: number;
+  level: number;
+  frogs_home: number;
+  time_bonus: number;
+  user_id: string | null;
+  created_at: string;
+};
 export type GlobalScoreRow = {
   id: string;
   game_id: string;

@@ -46,10 +46,10 @@ import {
   getSnakeSkin,
   setSnakeSkin,
 } from "@/components/games/snake/leaderboard";
-// Frogger todavía no tiene leaderboard propio: llega en la spec 10. Su
-// leaderboard.ts hoy solo guarda la preferencia de skin en localStorage.
 import { FroggerCanvas } from "@/components/games/frogger/frogger-canvas";
 import {
+  addFroggerScore,
+  getFroggerLeaderboard,
   getFroggerSkin,
   setFroggerSkin,
 } from "@/components/games/frogger/leaderboard";
@@ -389,10 +389,20 @@ export function GamePlayer({ game }: { game: Game }) {
     setOver(true);
     loadSnakeLeaderboard();
   };
-  // Sin carga de leaderboard: Frogger todavía no persiste puntajes (spec 10).
+  const loadFroggerLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardFetchError(null);
+    getFroggerLeaderboard()
+      .then(setLeaderboardEntries)
+      .catch(() =>
+        setLeaderboardFetchError("No se pudieron cargar las puntuaciones."),
+      )
+      .finally(() => setLeaderboardLoading(false));
+  };
   const handleFroggerGameOver = (result: FroggerGameOverResult) => {
     setFroggerResult(result);
     setOver(true);
+    loadFroggerLeaderboard();
   };
   const handleForceEnd = () => {
     if (isAsteroids) {
@@ -423,6 +433,7 @@ export function GamePlayer({ game }: { game: Game }) {
         frogsHome: 0,
         timeBonus: 0,
       });
+      loadFroggerLeaderboard();
     }
     setOver(true);
   };
@@ -668,7 +679,23 @@ export function GamePlayer({ game }: { game: Game }) {
                           setLeaderboardEntries(entries);
                         },
                       }
-                    : undefined
+                    : isFrogger
+                      ? {
+                          entries: leaderboardEntries,
+                          loading: leaderboardLoading,
+                          fetchError: leaderboardFetchError,
+                          onSaveName: async (name) => {
+                            const result = froggerResult ?? {
+                              score,
+                              level: engineLevel,
+                              frogsHome: 0,
+                              timeBonus: 0,
+                            };
+                            const entries = await addFroggerScore(name, result);
+                            setLeaderboardEntries(entries);
+                          },
+                        }
+                      : undefined
           }
           onRestart={restart}
         />
