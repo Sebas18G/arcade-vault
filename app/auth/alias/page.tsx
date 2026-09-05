@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/safe-next";
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 10;
 // Primer login por OAuth (o registro que se quedó a medias): el usuario ya tiene
@@ -13,7 +14,7 @@ function AliasCard() {
   const [checking, setChecking] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/games";
+  const next = safeNext(searchParams.get("next"));
   useEffect(() => {
     let cancelled = false;
     const supabase = createClient();
