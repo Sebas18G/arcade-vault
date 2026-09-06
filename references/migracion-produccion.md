@@ -36,8 +36,12 @@ existan y sean visibles por SQL directo.
 Dashboard → **SQL Editor** → pegar el contenido completo de
 [`supabase/prod/bootstrap.sql`](../supabase/prod/bootstrap.sql) → Run.
 
-Crea el schema, las 8 tablas, RLS con sus 15 policies, las 3 funciones, los 11
-triggers, los grants, la publicación de Realtime y las 5 filas de `games`.
+Crea el schema, las 9 tablas, RLS con sus 17 policies, las 4 funciones, los 14
+triggers, los grants, la publicación de Realtime y las 6 filas de `games`.
+
+De esos 14 triggers, 13 cuelgan de tablas de `"arcade-vault"` y **uno cuelga de
+`auth.users`**: `on_auth_user_created`, que crea el perfil dentro de la misma
+transacción que el usuario (spec 17). Es el único que toca un schema ajeno.
 
 Corre dentro de una transacción y es idempotente: si algo falla no queda nada a
 medias, y volver a ejecutarlo sobre una base ya migrada no rompe nada.
@@ -48,10 +52,10 @@ medias, y volver a ejecutarlo sobre una base ya migrada no rompe nada.
 
 SQL Editor → pegar [`supabase/prod/verify.sql`](../supabase/prod/verify.sql) → Run.
 
-Devuelve 10 filas. **Todas deben decir `OK`.** Si alguna dice `FALLA`, la columna
+Devuelve 11 filas. **Todas deben decir `OK`.** Si alguna dice `FALLA`, la columna
 `real` señala qué faltó; volver a correr el bootstrap completo es seguro.
 
-- [ ] Las 10 filas dicen OK
+- [ ] Las 11 filas dicen OK
 
 ## Paso 4 — Configurar Auth
 
@@ -60,9 +64,22 @@ en ningún script y hay que hacerlo a mano.
 
 **Authentication → Sign In / Providers → Email**
 
-- [ ] **"Confirm email" desactivado.** La spec 12 lo exige: el registro deja
-      sesión activa de inmediato y `/auth` no tiene pantalla de "revisa tu correo".
-      Con esto encendido, el registro parece colgado.
+- [ ] **"Confirm email" desactivado.** Las specs 12 y 17 lo exigen: el registro
+      deja sesión activa de inmediato y `/auth` no tiene pantalla de "revisa tu
+      correo". Con esto encendido, `signUp()` devuelve `session = null` y el
+      jugador acaba desviado a `/auth/alias` sin sesión que verificar.
+
+      Es el paso que en desarrollo se olvidó durante toda la spec 12 y que la 17
+      tuvo que ir a arreglar. **Verificación objetiva**, tras el primer registro
+      de prueba: `email_confirmed_at` y `created_at` del usuario nuevo difieren
+      en milisegundos. Si difieren en segundos, hubo un clic en un correo y el
+      toggle sigue encendido.
+
+      ```sql
+      select email, created_at, email_confirmed_at,
+             email_confirmed_at - created_at as delta
+      from auth.users order by created_at desc limit 1;
+      ```
 
 **Authentication → Passwords**
 
@@ -132,11 +149,17 @@ Con la app apuntando a producción:
       (valida `proxy.ts` y que el schema esté expuesto)
 - [ ] Registro con correo + contraseña → entra de inmediato, sin correo de
       confirmación, y crea fila en `auth.users` **y** en `"arcade-vault".profiles`
+      en el mismo instante (valida `on_auth_user_created`)
+- [ ] Registro con un alias ya tomado → mensaje en Español y **ningún usuario
+      nuevo** en `auth.users`: el trigger revierte el alta entera. Comprobarlo con
+      `select count(*) from auth.users;` antes y después
 - [ ] Login con Google y con GitHub en ventana anónima → primera vez aterriza en
-      `/auth/alias`, segunda vez entra directo a `/games`
-- [ ] Guardar puntaje en los 5 juegos con leaderboard (asteroids, tetris,
-      arkanoid, snake, frogger) → cada fila queda en su tabla con el alias del
-      perfil **y** espejada en `global_scores` (valida los 10 triggers)
+      `/auth/alias`, segunda vez entra directo a `/games`. El trigger no debe
+      estorbar aquí: OAuth no manda `username` en los metadatos
+- [ ] Guardar puntaje en los 6 juegos con leaderboard (asteroids, tetris,
+      arkanoid, snake, frogger, invasores) → cada fila queda en su tabla con el
+      alias del perfil **y** espejada en `global_scores` (valida los 12 triggers
+      de puntajes)
 - [ ] Con `/salon` abierto en otra pestaña, guardar un puntaje → aparece en vivo
       sin recargar (valida Realtime)
 - [ ] Formulario de `/about` → el correo llega (valida Resend en producción)
@@ -154,9 +177,14 @@ drop schema "arcade-vault" cascade;
 ```
 
 Eso borra tablas, funciones, triggers y policies, y saca las tablas de la
-publicación de Realtime. Las cuentas de `auth.users` **no** se borran (viven en
-otro schema): si quieres partir de cero del todo, elimínalas desde
-Authentication → Users. Después, volver al paso 2.
+publicación de Realtime. El `cascade` alcanza también a `on_auth_user_created`,
+que vive en `auth.users` pero depende de una función del schema: desaparece con
+él, y hasta que no se rehaga el bootstrap **los registros nuevos no crearán
+perfil** (el alta en sí seguirá funcionando).
+
+Las cuentas de `auth.users` **no** se borran (viven en otro schema): si quieres
+partir de cero del todo, elimínalas desde Authentication → Users. Después, volver
+al paso 2.
 
 **Ojo:** en cuanto haya puntajes reales de jugadores, esto deja de ser un
 rollback y pasa a ser una pérdida de datos.
@@ -169,13 +197,62 @@ Mientras no exista una carpeta `supabase/migrations/`, **producción no se
 sincroniza sola**. El flujo para cualquier cambio de esquema es:
 
 1. Aplicarlo en desarrollo como siempre (spec → `/spec-impl` → `apply_migration`).
-2. Reflejar el mismo cambio en `supabase/prod/bootstrap.sql`, manteniéndolo
+2. Guardar el SQL **exacto** que se aplicó en `supabase/dev/NN-slug.sql`, con el
+   nombre y la versión de la migración en la cabecera. Es el historial legible
+   que sustituye a `supabase/migrations/` mientras no haya CLI.
+3. Reflejar el mismo cambio en `supabase/prod/bootstrap.sql`, manteniéndolo
    idempotente y en la sección que le corresponde.
-3. Actualizar los conteos esperados de `supabase/prod/verify.sql` si cambió el
-   número de tablas, policies, funciones o triggers.
-4. Aplicar en producción: el `alter`/`create` concreto en el SQL Editor, o el
+4. Actualizar los conteos esperados de `supabase/prod/verify.sql` si cambió el
+   número de tablas, policies, funciones o triggers, y añadir un chequeo nuevo si
+   el objeto no encaja en ninguno (como el trigger de `auth.users` de la spec 17).
+5. Actualizar este runbook si cambian los conteos del Paso 2, el número de filas
+   del Paso 3, o los pasos manuales de Auth.
+6. Aplicar en producción: el `alter`/`create` concreto en el SQL Editor, o el
    bootstrap completo (es idempotente, pero no borra lo que ya no debería estar —
    un `drop policy` viejo hay que ejecutarlo a mano).
+
+### Delta pendiente: spec 17 sobre una producción ya migrada
+
+Si producción se montó **antes** del 2026-09-06, le falta el trigger que crea el
+perfil. Correr el `bootstrap.sql` completo vale (es idempotente) y es lo más
+seguro; si prefieres aplicar solo el delta, pega esto en el SQL Editor — es el
+contenido de [`supabase/dev/17-registro-con-correo-y-pulido-auth.sql`](../supabase/dev/17-registro-con-correo-y-pulido-auth.sql):
+
+```sql
+create or replace function "arcade-vault".handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  alias text := upper(trim(new.raw_user_meta_data->>'username'));
+begin
+  if alias is null or alias = '' then
+    return new;
+  end if;
+
+  insert into "arcade-vault".profiles (id, username)
+  values (new.id, alias);
+
+  return new;
+end;
+$function$;
+
+revoke execute on function "arcade-vault".handle_new_user() from public, anon, authenticated;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function "arcade-vault".handle_new_user();
+```
+
+Y comprobar que el toggle **"Confirm email"** del Paso 4 sigue desactivado: sin
+él, el trigger crea el perfil igual pero la sesión no queda activa.
+
+Las cuentas que ya existan en producción sin fila en `profiles` no se reparan
+solas — el trigger solo gobierna las altas nuevas. Esas siguen entrando por
+`/auth/alias`, que es justo para lo que está.
 
 Cuando el ritmo de cambios haga esto pesado, la salida natural es migrar al
 Supabase CLI: `supabase link` + `supabase db push` contra cada proyecto, con las
@@ -185,7 +262,7 @@ entonces el punto de partida de la migración inicial.
 ## Endurecimiento opcional
 
 `bootstrap.sql` reproduce los grants de desarrollo tal cual, incluido
-`grant insert ... to anon` en las 5 tablas de puntajes. Ese permiso **no sirve de
+`grant insert ... to anon` en las 6 tablas de puntajes. Ese permiso **no sirve de
 nada hoy**: ninguna policy de `INSERT` admite al rol `anon`, así que RLS lo frena
 igual. Es un resto de las specs 06/08, anteriores a que existiera autenticación.
 
@@ -197,6 +274,7 @@ revoke insert on "arcade-vault".tetris_scores    from anon;
 revoke insert on "arcade-vault".arkanoid_scores  from anon;
 revoke insert on "arcade-vault".snake_scores     from anon;
 revoke insert on "arcade-vault".frogger_scores   from anon;
+revoke insert on "arcade-vault".invasores_scores from anon;
 ```
 
 No cambia el comportamiento de la app: los puntajes se guardan siempre con sesión

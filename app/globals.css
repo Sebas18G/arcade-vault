@@ -1468,6 +1468,115 @@ a {
   padding: 12px;
   font-size: 9px;
 }
+/* Los logos van con su color de marca (Google) o el del texto (GitHub), así que
+   el tamaño se fija aquí y el color lo decide cada SVG. */
+.social .btn svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+/* Mostrar/ocultar contraseña: el botón se superpone al input, que reserva el
+   hueco con padding-right para que el texto nunca pase por debajo. */
+.field-control {
+  position: relative;
+  display: flex;
+}
+.field-control input {
+  width: 100%;
+  padding-right: 52px;
+}
+.field-reveal {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--line);
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: color 140ms;
+}
+.field-reveal:hover,
+.field-reveal:focus-visible {
+  color: var(--cyan);
+}
+/* Validación en vivo del alias: el borde se adelanta al mensaje de error. */
+.field input.is-valid {
+  border-color: var(--green);
+}
+.field input.is-valid:focus {
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.32);
+}
+.field input.is-invalid {
+  border-color: var(--magenta);
+}
+.field input.is-invalid:focus {
+  box-shadow: 0 0 12px rgba(255, 0, 110, 0.32);
+}
+.field-hint {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.1em;
+}
+.field-count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.field-count.is-valid {
+  color: var(--green);
+}
+.field-count.is-invalid {
+  color: var(--magenta);
+}
+/* El error se leía como un pie de campo más; ahora tiene fondo, filo y un texto
+   bastante más claro que el magenta puro sobre el fondo oscuro. */
+.auth-error {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 0, 110, 0.1);
+  border-left: 2px solid var(--magenta);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: #ffc2dd;
+  letter-spacing: 0.06em;
+}
+.auth-error::before {
+  content: "▸";
+  color: var(--magenta);
+  flex: none;
+}
+/* Carga por botón: el pulsado gira, los demás solo se apagan sin moverse. */
+.auth-card .btn .spinner {
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  box-shadow: none;
+}
+.auth-card .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.auth-card .btn:disabled:hover {
+  color: var(--ink);
+  box-shadow: none;
+}
+.auth-card .btn.ghost:disabled:hover {
+  color: var(--ink-dim);
+  border-color: var(--ink-faint);
+}
 
 /* ===== salón ===== */
 .av-hall {
