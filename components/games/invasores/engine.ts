@@ -1,4 +1,9 @@
 import type { InvasoresGameOverResult } from "@/components/games/shared/types";
+import type { GameSkin } from "@/components/games/shared/skins";
+import {
+  INVASORES_SKIN_PALETTES,
+  type InvasoresPalette,
+} from "@/components/games/invasores/skins";
 export const INVASORES_WIDTH = 800;
 export const INVASORES_HEIGHT = 600;
 export const ROWS = 5;
@@ -124,23 +129,8 @@ export type InvasoresEngineCallbacks = {
   onLevelChange: (level: number) => void;
   onGameOver: (result: InvasoresGameOverResult) => void;
 };
-/**
- * Paleta fija. La spec 14 deja las skins fuera de alcance a propósito: el motor
- * nace monocromo-neón y el agente `skin-designer` agrega `skins.ts`/`setSkin()`
- * en una pasada posterior, igual que hizo con Frogger tras la spec 09.
- */
-const COLORS = {
-  bg: "#04070a",
-  ground: "#39ff14",
-  cannon: "#39ff14",
-  bunker: "#39ff14",
-  /** Un color por fila, alineado con ROW_POINTS: 30 / 20 / 20 / 10 / 10. */
-  rows: ["#7df9ff", "#39ff14", "#39ff14", "#ffd166", "#ffd166"] as const,
-  ufo: "#ff2e88",
-  explosion: "#ff9f1c",
-  playerBullet: "#eaffea",
-  alienBullet: "#ff6b6b",
-};
+// Los colores ya no viven aquí: entran por `setSkin()` desde ./skins. El motor
+// nunca lee `document`, `window` ni `localStorage` — la paleta es un argumento.
 /**
  * Sprites procedurales: cada especie es un bitmap de texto que se pinta con
  * `fillRect` celda a celda. Sin un solo asset binario, como pide la spec.
@@ -316,9 +306,20 @@ export class InvasoresEngine {
   private aliensKilled = 0;
   private ufosHit = 0;
   private shotsFired = 0;
+  private skin: GameSkin = "classic";
+  private palette: InvasoresPalette = INVASORES_SKIN_PALETTES.classic;
   constructor(callbacks: InvasoresEngineCallbacks) {
     this.callbacks = callbacks;
     this.restart();
+  }
+  /** La paleta entra solo por acá: el motor no lee ninguna preferencia. */
+  setSkin(skin: GameSkin) {
+    this.skin = skin;
+    this.palette =
+      INVASORES_SKIN_PALETTES[skin] ?? INVASORES_SKIN_PALETTES.classic;
+  }
+  getSkin(): GameSkin {
+    return this.skin;
   }
   restart() {
     this.score = 0;
@@ -709,7 +710,9 @@ export class InvasoresEngine {
       this.playerBullet = null;
       return;
     }
-    if (this.hitBunker(bullet.x, bullet.y, BULLET_W, BULLET_H, BLAST_PLAYER, -1)) {
+    if (
+      this.hitBunker(bullet.x, bullet.y, BULLET_W, BULLET_H, BLAST_PLAYER, -1)
+    ) {
       this.playerBullet = null;
       return;
     }
@@ -765,42 +768,87 @@ export class InvasoresEngine {
       invader.y += STEP_DOWN;
     }
   }
+  /**
+   * Enciende el halo de la skin. Con `amount <= 0` **no toca el contexto**, así
+   * que `classic` y `retro` emiten exactamente las mismas llamadas de dibujo
+   * que el motor tenía antes de existir las skins.
+   */
+  private setGlow(
+    ctx: CanvasRenderingContext2D,
+    color: string,
+    amount: number,
+  ) {
+    if (amount <= 0) return;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = amount;
+  }
+  /** Apaga el halo. Se llama siempre tras dibujar, para que no se filtre. */
+  private clearGlow(ctx: CanvasRenderingContext2D) {
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "transparent";
+  }
   draw(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = COLORS.bg;
+    const palette = this.palette;
+    ctx.fillStyle = palette.bg;
     ctx.fillRect(0, 0, INVASORES_WIDTH, INVASORES_HEIGHT);
     if (this.ufo) {
-      drawSprite(
-        ctx,
-        SPRITE_UFO,
-        this.ufo.x,
-        UFO_Y,
-        UFO_W,
-        UFO_H,
-        COLORS.ufo,
-      );
+      this.setGlow(ctx, palette.ufo, palette.glow.ufo);
+      drawSprite(ctx, SPRITE_UFO, this.ufo.x, UFO_Y, UFO_W, UFO_H, palette.ufo);
+      this.clearGlow(ctx);
     }
     this.drawInvaders(ctx);
     this.drawBunkers(ctx);
     this.drawCannon(ctx);
     if (this.playerBullet) {
-      ctx.fillStyle = COLORS.playerBullet;
+      this.setGlow(ctx, palette.playerBullet, palette.glow.playerBullet);
+      ctx.fillStyle = palette.playerBullet;
       ctx.fillRect(
         this.playerBullet.x,
         this.playerBullet.y,
         BULLET_W,
         BULLET_H,
       );
+      this.clearGlow(ctx);
     }
-    ctx.fillStyle = COLORS.alienBullet;
+    this.setGlow(ctx, palette.alienBullet, palette.glow.alienBullet);
+    ctx.fillStyle = palette.alienBullet;
     for (const bullet of this.alienBullets) {
-      ctx.fillRect(bullet.x, bullet.y, ALIEN_BULLET_W, ALIEN_BULLET_H);
+      this.drawAlienBullet(ctx, bullet.x, bullet.y);
     }
-    ctx.fillStyle = COLORS.ground;
+    this.clearGlow(ctx);
+    this.setGlow(ctx, palette.ground, palette.glow.ground);
+    ctx.fillStyle = palette.ground;
     ctx.fillRect(0, GROUND_Y, INVASORES_WIDTH, 2);
+    this.clearGlow(ctx);
+  }
+  /**
+   * Silueta del proyectil alienígena. `solid` es el rectángulo del motor
+   * original; `zigzag` lo parte en 4 segmentos que alternan 1 px a cada lado,
+   * evocando los "squiggly shots" del arcade. El desvío es de 1 px justamente
+   * para que la silueta siga cabiendo casi dentro de la caja de colisión real
+   * (ALIEN_BULLET_W × ALIEN_BULLET_H), que no cambia con la skin.
+   */
+  private drawAlienBullet(ctx: CanvasRenderingContext2D, x: number, y: number) {
+    if (this.palette.alienBulletStyle === "solid") {
+      ctx.fillRect(x, y, ALIEN_BULLET_W, ALIEN_BULLET_H);
+      return;
+    }
+    const segments = 4;
+    const segH = ALIEN_BULLET_H / segments;
+    for (let i = 0; i < segments; i++) {
+      ctx.fillRect(
+        x + (i % 2 === 0 ? -1 : 1),
+        y + i * segH,
+        ALIEN_BULLET_W,
+        segH,
+      );
+    }
   }
   private drawInvaders(ctx: CanvasRenderingContext2D) {
+    const palette = this.palette;
     for (const invader of this.invaders) {
       if (!invader.alive) continue;
+      this.setGlow(ctx, palette.rows[invader.row], palette.glow.invader);
       drawSprite(
         ctx,
         ROW_SPRITES[invader.row],
@@ -808,16 +856,56 @@ export class InvasoresEngine {
         invader.y,
         INVADER_W,
         INVADER_H,
-        COLORS.rows[invader.row],
+        palette.rows[invader.row],
       );
+      this.clearGlow(ctx);
     }
   }
+  /**
+   * Una celda del búnker está "expuesta" si cae en el perímetro de la máscara
+   * o si tiene al menos un vecino ortogonal apagado. Es lo que dibuja la
+   * erosión: cada cráter abierto por un disparo se rodea de su propio canto.
+   */
+  private isBunkerEdge(cells: boolean[][], r: number, c: number): boolean {
+    if (r === 0 || r === BUNKER_ROWS - 1) return true;
+    if (c === 0 || c === BUNKER_COLS - 1) return true;
+    return (
+      !cells[r - 1][c] ||
+      !cells[r + 1][c] ||
+      !cells[r][c - 1] ||
+      !cells[r][c + 1]
+    );
+  }
   private drawBunkers(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = COLORS.bunker;
+    const palette = this.palette;
+    this.setGlow(ctx, palette.bunker, palette.glow.bunker);
+    // Ruta original: un solo color para toda la máscara. La usa `classic`.
+    if (!palette.bunkerEdge) {
+      ctx.fillStyle = palette.bunker;
+      for (const bunker of this.bunkers) {
+        for (let r = 0; r < BUNKER_ROWS; r++) {
+          for (let c = 0; c < BUNKER_COLS; c++) {
+            if (!bunker.cells[r][c]) continue;
+            ctx.fillRect(
+              bunker.x + c * BUNKER_CELL,
+              bunker.y + r * BUNKER_CELL,
+              BUNKER_CELL,
+              BUNKER_CELL,
+            );
+          }
+        }
+      }
+      this.clearGlow(ctx);
+      return;
+    }
+    // Dos tonos: relleno + canto expuesto, para que el daño se lea de un vistazo.
     for (const bunker of this.bunkers) {
       for (let r = 0; r < BUNKER_ROWS; r++) {
         for (let c = 0; c < BUNKER_COLS; c++) {
           if (!bunker.cells[r][c]) continue;
+          ctx.fillStyle = this.isBunkerEdge(bunker.cells, r, c)
+            ? palette.bunkerEdge
+            : palette.bunker;
           ctx.fillRect(
             bunker.x + c * BUNKER_CELL,
             bunker.y + r * BUNKER_CELL,
@@ -827,13 +915,16 @@ export class InvasoresEngine {
         }
       }
     }
+    this.clearGlow(ctx);
   }
   private drawCannon(ctx: CanvasRenderingContext2D) {
+    const palette = this.palette;
     if (this.deathMs > 0) {
       const frame =
         Math.floor(this.deathMs / DEATH_FRAME_MS) % 2 === 0
           ? SPRITE_WRECK_A
           : SPRITE_WRECK_B;
+      this.setGlow(ctx, palette.wreck, palette.glow.wreck);
       drawSprite(
         ctx,
         frame,
@@ -841,10 +932,12 @@ export class InvasoresEngine {
         CANNON_Y,
         CANNON_W,
         CANNON_H,
-        COLORS.explosion,
+        palette.wreck,
       );
+      this.clearGlow(ctx);
       return;
     }
+    this.setGlow(ctx, palette.cannon, palette.glow.cannon);
     drawSprite(
       ctx,
       SPRITE_CANNON,
@@ -852,7 +945,8 @@ export class InvasoresEngine {
       CANNON_Y,
       CANNON_W,
       CANNON_H,
-      COLORS.cannon,
+      palette.cannon,
     );
+    this.clearGlow(ctx);
   }
 }

@@ -11,6 +11,7 @@ import type {
   GameCanvasProps,
   InvasoresGameOverResult,
 } from "@/components/games/shared/types";
+import { DEFAULT_GAME_SKIN } from "@/components/games/shared/skins";
 // Flechas y A/D en simultáneo, siguiendo el precedente de Snake (spec 08) y
 // Frogger (spec 09). El disparo va en Space.
 function inputFromKey(key: string): InvasoresInput | null {
@@ -34,7 +35,14 @@ export const InvasoresCanvas = forwardRef<
   GameCanvasHandle,
   GameCanvasProps<InvasoresGameOverResult>
 >(function InvasoresCanvas(
-  { paused, onScoreChange, onLivesChange, onLevelChange, onGameOver },
+  {
+    paused,
+    skin = DEFAULT_GAME_SKIN,
+    onScoreChange,
+    onLivesChange,
+    onLevelChange,
+    onGameOver,
+  },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -64,6 +72,7 @@ export const InvasoresCanvas = forwardRef<
       onGameOver: (result) => callbacksRef.current.onGameOver(result),
     });
     engineRef.current = engine;
+    engine.setSkin(skin);
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement && document.activeElement.tagName === "INPUT")
         return;
@@ -95,10 +104,14 @@ export const InvasoresCanvas = forwardRef<
       window.removeEventListener("keyup", handleKeyUp);
       engineRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     engineRef.current?.setPaused(paused);
   }, [paused]);
+  useEffect(() => {
+    engineRef.current?.setSkin(skin);
+  }, [skin]);
   useImperativeHandle(ref, () => ({
     restart: () => engineRef.current?.restart(),
   }));

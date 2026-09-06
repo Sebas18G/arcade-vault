@@ -35,8 +35,12 @@ export type LeaderboardEntry = {
 };
 export type GameCanvasProps<TResult extends GameOverResult = GameOverResult> = {
   paused: boolean;
-  /** Opcional: los canvas todavía sin skins (arkanoid) lo ignoran. */
-  skin?: GameSkin;
+  /**
+   * Obligatorio desde 2026-09-05: con `invasores` migrado ya no queda ningún
+   * canvas sin skin. Tetris queda fuera de este campo por tener sus 4 skins
+   * propias — lo reemplaza con `Omit<GameCanvasProps<...>, "skin">`.
+   */
+  skin: GameSkin;
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
   onLevelChange: (level: number) => void;

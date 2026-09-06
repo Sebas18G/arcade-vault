@@ -3,7 +3,14 @@ import type {
   GameOverResult,
   LeaderboardEntry,
 } from "@/components/games/shared/types";
+import {
+  isGameSkin,
+  DEFAULT_GAME_SKIN,
+  type GameSkin,
+} from "@/components/games/shared/skins";
 import { requireUserId } from "@/components/games/shared/session";
+// Preferencia de UI: vive solo en localStorage, nunca en Supabase.
+const SKIN_KEY = "arkanoid-skin";
 const MAX_ENTRIES = 5;
 export async function getArkanoidLeaderboard(): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
@@ -34,4 +41,19 @@ export async function addArkanoidScore(
   });
   if (error) throw error;
   return getArkanoidLeaderboard();
+}
+export function getArkanoidSkin(): GameSkin {
+  try {
+    const stored = localStorage.getItem(SKIN_KEY);
+    return isGameSkin(stored) ? stored : DEFAULT_GAME_SKIN;
+  } catch {
+    return DEFAULT_GAME_SKIN;
+  }
+}
+export function setArkanoidSkin(skin: GameSkin): void {
+  try {
+    localStorage.setItem(SKIN_KEY, skin);
+  } catch {
+    // localStorage no disponible
+  }
 }

@@ -6,7 +6,6 @@ import type {
   GameCanvasHandle,
   GameCanvasProps,
 } from "@/components/games/shared/types";
-import type { GameSkin } from "@/components/games/shared/skins";
 const CONTROL_KEYS = [
   "Space",
   "ArrowUp",
@@ -14,12 +13,9 @@ const CONTROL_KEYS = [
   "ArrowLeft",
   "ArrowRight",
 ];
-type AsteroidsCanvasProps = GameCanvasProps<AsteroidsGameOverResult> & {
-  skin?: GameSkin;
-};
 export const AsteroidsCanvas = forwardRef<
   GameCanvasHandle,
-  AsteroidsCanvasProps
+  GameCanvasProps<AsteroidsGameOverResult>
 >(function AsteroidsCanvas(
   {
     paused,

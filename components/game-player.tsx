@@ -35,6 +35,8 @@ import { ArkanoidCanvas } from "@/components/games/arkanoid/arkanoid-canvas";
 import {
   addArkanoidScore,
   getArkanoidLeaderboard,
+  getArkanoidSkin,
+  setArkanoidSkin,
 } from "@/components/games/arkanoid/leaderboard";
 import { SnakeCanvas } from "@/components/games/snake/snake-canvas";
 import {
@@ -54,6 +56,8 @@ import {
 import {
   addInvasoresScore,
   getInvasoresLeaderboard,
+  getInvasoresSkin,
+  setInvasoresSkin,
 } from "@/components/games/invasores/leaderboard";
 const LIVES = 3;
 const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
@@ -66,12 +70,13 @@ type SkinOption = { value: string; label: string };
 // Registro de skins por juego: el botón "SKIN" del HUD se renderiza para
 // cualquier juego presente aquí. Tetris conserva sus 4 skins propias; los
 // juegos migrados al contrato compartido usan las 3 de GAME_SKINS.
-// (arkanoid todavía no tiene skins: por eso no figura).
 const SKINS_BY_GAME: Record<string, SkinOption[]> = {
   tetris: TETRIS_SKINS,
   asteroids: GAME_SKINS,
   snake: GAME_SKINS,
   frogger: GAME_SKINS,
+  arkanoid: GAME_SKINS,
+  invasores: GAME_SKINS,
 };
 // Lectura/escritura de la preferencia, delegada al leaderboard.ts de cada juego.
 // Ambas claves son "<gameId>-skin" ("tetris-skin" es la que Tetris ya usaba,
@@ -95,6 +100,14 @@ const SKIN_STORAGE: Record<
   frogger: {
     read: getFroggerSkin,
     write: (value) => setFroggerSkin(value as GameSkin),
+  },
+  arkanoid: {
+    read: getArkanoidSkin,
+    write: (value) => setArkanoidSkin(value as GameSkin),
+  },
+  invasores: {
+    read: getInvasoresSkin,
+    write: (value) => setInvasoresSkin(value as GameSkin),
   },
 };
 function GameOverModal({
@@ -567,6 +580,7 @@ export function GamePlayer({
             <ArkanoidCanvas
               ref={canvasRef}
               paused={paused || over}
+              skin={skin as GameSkin}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
@@ -596,6 +610,7 @@ export function GamePlayer({
             <InvasoresCanvas
               ref={canvasRef}
               paused={paused || over}
+              skin={skin as GameSkin}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
