@@ -5,6 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/safe-next";
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 10;
+// El destino original tiene que sobrevivir al desvío por /auth/alias, igual que
+// hace app/auth/callback/route.ts con el retorno de OAuth.
+function aliasHref(next: string): string {
+  return `/auth/alias?next=${encodeURIComponent(next)}`;
+}
 // Los mensajes de Supabase Auth llegan en inglés: se traducen aquí para que la
 // tarjeta hable siempre en Español.
 function translateAuthError(message: string): string {
@@ -42,12 +47,27 @@ function AuthCard() {
   };
   const signIn = async () => {
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: pass,
-    });
+    const { data, error: signInError } = await supabase.auth.signInWithPassword(
+      {
+        email: email.trim(),
+        password: pass,
+      },
+    );
     if (signInError) {
       setError(translateAuthError(signInError.message));
+      return;
+    }
+    // Una cuenta anterior al trigger puede estar en auth.users sin fila en
+    // profiles. Sin alias el nav la muestra como anónima y /games la deja en un
+    // limbo sin identidad, así que se desvía igual que el retorno de OAuth.
+    // requirePlayer() es la red de seguridad, no el primer filtro.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (!profile) {
+      router.replace(aliasHref(next));
       return;
     }
     router.replace(next);
@@ -62,8 +82,10 @@ function AuthCard() {
       );
       return;
     }
-    // Chequeo previo: evita crear un usuario en auth.users que después no pueda
-    // quedarse con el alias que pidió.
+    // Solo un aviso de UX: ver "ese alias ya está tomado" mientras se escribe es
+    // mejor que verlo después de enviar el formulario. La garantía sigue siendo
+    // el `unique` de profiles, que el trigger hace valer dentro del alta; este
+    // select puede perder una carrera y no pasa nada.
     const { data: taken } = await supabase
       .from("profiles")
       .select("id")
@@ -73,28 +95,25 @@ function AuthCard() {
       setError("Ese alias ya está tomado. Elige otro.");
       return;
     }
+    // El alias viaja en los metadatos del alta: la fila de profiles la crea el
+    // trigger "arcade-vault".handle_new_user() dentro de la misma transacción
+    // que el usuario. Así no existe la ventana en la que auth.users tiene una
+    // fila y profiles no, que es lo que dejaba cuentas sin alias (spec 17).
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password: pass,
+      options: { data: { username } },
     });
     if (signUpError) {
       setError(translateAuthError(signUpError.message));
       return;
     }
     if (!data.session || !data.user) {
-      setError(
-        "La cuenta se creó pero la sesión no quedó activa. Inicia sesión con tu correo y contraseña.",
-      );
-      return;
-    }
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .insert({ id: data.user.id, username });
-    if (profileError) {
-      // Carrera por el alias (violación de unique) u otro fallo del insert: la
-      // sesión ya existe, así que /auth/alias es la red de contención.
-      console.error("[auth] no se pudo insertar el perfil:", profileError);
-      router.replace("/auth/alias");
+      // Fail-safe: con "Confirm email" desactivado esto no debería dispararse.
+      // Si alguien vuelve a encender el toggle, el alias ya no se pierde (lo
+      // guardó el trigger) y esto manda a /auth/alias, que reenvía a `next` en
+      // cuanto haya sesión, en vez de dejar un mensaje sin acción posible.
+      router.replace(aliasHref(next));
       return;
     }
     router.replace(next);
