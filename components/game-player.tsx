@@ -6,6 +6,7 @@ import { addScore } from "@/lib/storage";
 import type {
   AsteroidsGameOverResult,
   FroggerGameOverResult,
+  InvasoresGameOverResult,
   GameCanvasHandle,
   GameOverResult,
   LeaderboardEntry,
@@ -43,12 +44,17 @@ import {
   setSnakeSkin,
 } from "@/components/games/snake/leaderboard";
 import { FroggerCanvas } from "@/components/games/frogger/frogger-canvas";
+import { InvasoresCanvas } from "@/components/games/invasores/invasores-canvas";
 import {
   addFroggerScore,
   getFroggerLeaderboard,
   getFroggerSkin,
   setFroggerSkin,
 } from "@/components/games/frogger/leaderboard";
+import {
+  addInvasoresScore,
+  getInvasoresLeaderboard,
+} from "@/components/games/invasores/leaderboard";
 const LIVES = 3;
 const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
   { value: "retro", label: "Retro" },
@@ -255,8 +261,14 @@ export function GamePlayer({
   const isArkanoid = game.id === "arkanoid";
   const isSnake = game.id === "snake";
   const isFrogger = game.id === "frogger";
+  const isInvasores = game.id === "invasores";
   const isPortedGame =
-    isAsteroids || isTetris || isArkanoid || isSnake || isFrogger;
+    isAsteroids ||
+    isTetris ||
+    isArkanoid ||
+    isSnake ||
+    isFrogger ||
+    isInvasores;
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(LIVES);
   const [engineLevel, setEngineLevel] = useState(1);
@@ -273,6 +285,8 @@ export function GamePlayer({
   const [snakeResult, setSnakeResult] = useState<GameOverResult | null>(null);
   const [froggerResult, setFroggerResult] =
     useState<FroggerGameOverResult | null>(null);
+  const [invasoresResult, setInvasoresResult] =
+    useState<InvasoresGameOverResult | null>(null);
   const [leaderboardEntries, setLeaderboardEntries] = useState<
     LeaderboardEntry[]
   >([]);
@@ -332,6 +346,7 @@ export function GamePlayer({
     setArkanoidResult(null);
     setSnakeResult(null);
     setFroggerResult(null);
+    setInvasoresResult(null);
     setLeaderboardEntries([]);
     setLeaderboardLoading(false);
     setLeaderboardFetchError(null);
@@ -413,6 +428,21 @@ export function GamePlayer({
     setOver(true);
     loadFroggerLeaderboard();
   };
+  const loadInvasoresLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardFetchError(null);
+    getInvasoresLeaderboard()
+      .then(setLeaderboardEntries)
+      .catch(() =>
+        setLeaderboardFetchError("No se pudieron cargar las puntuaciones."),
+      )
+      .finally(() => setLeaderboardLoading(false));
+  };
+  const handleInvasoresGameOver = (result: InvasoresGameOverResult) => {
+    setInvasoresResult(result);
+    setOver(true);
+    loadInvasoresLeaderboard();
+  };
   const handleForceEnd = () => {
     if (isAsteroids) {
       setAsteroidsResult({
@@ -443,6 +473,16 @@ export function GamePlayer({
         timeBonus: 0,
       });
       loadFroggerLeaderboard();
+    }
+    if (isInvasores) {
+      setInvasoresResult({
+        score,
+        level: engineLevel,
+        aliensKilled: 0,
+        ufosHit: 0,
+        shotsFired: 0,
+      });
+      loadInvasoresLeaderboard();
     }
     setOver(true);
   };
@@ -552,6 +592,15 @@ export function GamePlayer({
               onLevelChange={setEngineLevel}
               onGameOver={handleFroggerGameOver}
             />
+          ) : isInvasores ? (
+            <InvasoresCanvas
+              ref={canvasRef}
+              paused={paused || over}
+              onScoreChange={setScore}
+              onLivesChange={setLives}
+              onLevelChange={setEngineLevel}
+              onGameOver={handleInvasoresGameOver}
+            />
           ) : (
             <div className="game-arena">
               <div className="grid-floor"></div>
@@ -605,7 +654,9 @@ export function GamePlayer({
                     ? (snakeResult?.score ?? score)
                     : isFrogger
                       ? (froggerResult?.score ?? score)
-                      : score
+                      : isInvasores
+                        ? (invasoresResult?.score ?? score)
+                        : score
           }
           level={
             isAsteroids
@@ -618,7 +669,9 @@ export function GamePlayer({
                     ? (snakeResult?.level ?? engineLevel)
                     : isFrogger
                       ? (froggerResult?.level ?? engineLevel)
-                      : undefined
+                      : isInvasores
+                        ? (invasoresResult?.level ?? engineLevel)
+                        : undefined
           }
           name={playerName}
           leaderboard={
@@ -698,7 +751,27 @@ export function GamePlayer({
                             setLeaderboardEntries(entries);
                           },
                         }
-                      : undefined
+                      : isInvasores
+                        ? {
+                            entries: leaderboardEntries,
+                            loading: leaderboardLoading,
+                            fetchError: leaderboardFetchError,
+                            onSaveName: async (name) => {
+                              const result = invasoresResult ?? {
+                                score,
+                                level: engineLevel,
+                                aliensKilled: 0,
+                                ufosHit: 0,
+                                shotsFired: 0,
+                              };
+                              const entries = await addInvasoresScore(
+                                name,
+                                result,
+                              );
+                              setLeaderboardEntries(entries);
+                            },
+                          }
+                        : undefined
           }
           onRestart={restart}
         />

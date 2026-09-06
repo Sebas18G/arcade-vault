@@ -12,16 +12,16 @@
 
 with chequeos as (
 
-  select 1 as orden, 'Tablas en el schema arcade-vault' as chequeo, 8 as esperado,
+  select 1 as orden, 'Tablas en el schema arcade-vault' as chequeo, 9 as esperado,
     (select count(*) from pg_tables where schemaname = 'arcade-vault')::int as real_
 
   union all
-  select 2, 'Tablas con RLS habilitado', 8,
+  select 2, 'Tablas con RLS habilitado', 9,
     (select count(*) from pg_tables
      where schemaname = 'arcade-vault' and rowsecurity)::int
 
   union all
-  select 3, 'Policies de RLS', 15,
+  select 3, 'Policies de RLS', 17,
     (select count(*) from pg_policies where schemaname = 'arcade-vault')::int
 
   union all
@@ -31,19 +31,19 @@ with chequeos as (
      where n.nspname = 'arcade-vault' and p.prokind = 'f')::int
 
   union all
-  select 5, 'Triggers (5 enforce + 5 mirror + 1 freeze)', 11,
+  select 5, 'Triggers (6 enforce + 6 mirror + 1 freeze)', 13,
     (select count(*) from pg_trigger t
      join pg_class c on c.oid = t.tgrelid
      join pg_namespace n on n.oid = c.relnamespace
      where n.nspname = 'arcade-vault' and not t.tgisinternal)::int
 
   union all
-  select 6, 'Tablas publicadas en Realtime', 6,
+  select 6, 'Tablas publicadas en Realtime', 7,
     (select count(*) from pg_publication_tables
      where pubname = 'supabase_realtime' and schemaname = 'arcade-vault')::int
 
   union all
-  select 7, 'Filas sembradas en games', 5,
+  select 7, 'Filas sembradas en games', 6,
     (select count(*) from "arcade-vault".games)::int
 
   -- Spec 13: toda función del schema debe tener search_path fijado. Un
@@ -85,11 +85,11 @@ order by orden;
 -- Chequeos de detalle (opcionales, para inspección manual)
 -- -----------------------------------------------------------------------------
 
--- Las 5 filas del catálogo:
+-- Las 6 filas del catálogo:
 --   select * from "arcade-vault".games order by id;
---   -> arkanoid / asteroids / frogger / snake / tetris
+--   -> arkanoid / asteroids / frogger / invasores / snake / tetris
 
--- Los 11 triggers, tabla por tabla:
+-- Los 13 triggers, tabla por tabla:
 --   select c.relname, t.tgname
 --   from pg_trigger t
 --   join pg_class c on c.oid = t.tgrelid
@@ -97,7 +97,7 @@ order by orden;
 --   where n.nspname = 'arcade-vault' and not t.tgisinternal
 --   order by 1, 2;
 
--- Las 15 policies con su condición:
+-- Las 17 policies con su condición:
 --   select tablename, policyname, cmd, roles, qual, with_check
 --   from pg_policies where schemaname = 'arcade-vault' order by 1, 2;
 

@@ -3,7 +3,7 @@
 -- =============================================================================
 --
 -- Reproduce en una instancia limpia todo el esquema que en desarrollo se fue
--- construyendo con 15 migraciones incrementales (specs 04, 06, 08, 12, 13 y las
+-- construyendo con 16 migraciones incrementales (specs 04, 06, 08, 12, 13, 15 y las
 -- de games-jam). Es la consolidación de ese historial en un solo archivo.
 --
 -- CÓMO USARLO
@@ -112,8 +112,20 @@ create table if not exists "arcade-vault".frogger_scores (
   created_at timestamptz not null default now()
 );
 
+create table if not exists "arcade-vault".invasores_scores (
+  id uuid primary key default gen_random_uuid(),
+  player_name text not null check (char_length(player_name) between 1 and 10),
+  score integer not null check (score >= 0),
+  level integer not null default 1,
+  aliens_killed integer not null default 0,
+  ufos_hit integer not null default 0,
+  shots_fired integer not null default 0,
+  user_id uuid references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
 -- Espejo cross-juego. Nadie inserta aquí desde el cliente: la pueblan los
--- triggers AFTER INSERT de las 5 tablas de arriba.
+-- triggers AFTER INSERT de las 6 tablas de arriba.
 create table if not exists "arcade-vault".global_scores (
   id uuid primary key default gen_random_uuid(),
   game_id text not null references "arcade-vault".games(id),
@@ -135,6 +147,7 @@ alter table "arcade-vault".tetris_scores    enable row level security;
 alter table "arcade-vault".arkanoid_scores  enable row level security;
 alter table "arcade-vault".snake_scores     enable row level security;
 alter table "arcade-vault".frogger_scores   enable row level security;
+alter table "arcade-vault".invasores_scores enable row level security;
 alter table "arcade-vault".global_scores    enable row level security;
 
 -- -----------------------------------------------------------------------------
@@ -218,6 +231,18 @@ create policy frogger_scores_select_public on "arcade-vault".frogger_scores
 
 drop policy if exists frogger_scores_insert_own on "arcade-vault".frogger_scores;
 create policy frogger_scores_insert_own on "arcade-vault".frogger_scores
+  for insert to authenticated with check (
+    user_id = auth.uid()
+    and char_length(player_name) between 1 and 10
+    and score >= 0
+  );
+
+drop policy if exists invasores_scores_select_public on "arcade-vault".invasores_scores;
+create policy invasores_scores_select_public on "arcade-vault".invasores_scores
+  for select to anon, authenticated using (true);
+
+drop policy if exists invasores_scores_insert_own on "arcade-vault".invasores_scores;
+create policy invasores_scores_insert_own on "arcade-vault".invasores_scores
   for insert to authenticated with check (
     user_id = auth.uid()
     and char_length(player_name) between 1 and 10
@@ -352,6 +377,16 @@ create trigger frogger_mirror
   after insert on "arcade-vault".frogger_scores
   for each row execute function "arcade-vault".mirror_to_global_scores('frogger');
 
+drop trigger if exists invasores_enforce_player_name on "arcade-vault".invasores_scores;
+create trigger invasores_enforce_player_name
+  before insert on "arcade-vault".invasores_scores
+  for each row execute function "arcade-vault".enforce_player_name();
+
+drop trigger if exists invasores_mirror on "arcade-vault".invasores_scores;
+create trigger invasores_mirror
+  after insert on "arcade-vault".invasores_scores
+  for each row execute function "arcade-vault".mirror_to_global_scores('invasores');
+
 drop trigger if exists profiles_freeze_username on "arcade-vault".profiles;
 create trigger profiles_freeze_username
   before update on "arcade-vault".profiles
@@ -375,6 +410,7 @@ grant select, insert on "arcade-vault".tetris_scores    to anon, authenticated;
 grant select, insert on "arcade-vault".arkanoid_scores  to anon, authenticated;
 grant select, insert on "arcade-vault".snake_scores     to anon, authenticated;
 grant select, insert on "arcade-vault".frogger_scores   to anon, authenticated;
+grant select, insert on "arcade-vault".invasores_scores to anon, authenticated;
 
 -- Nota: el INSERT de `anon` es paridad con desarrollo y hoy no sirve de nada,
 -- porque ninguna policy de INSERT admite a ese rol. Ver la sección
@@ -393,7 +429,7 @@ declare
 begin
   foreach t in array array[
     'asteroids_scores', 'tetris_scores', 'arkanoid_scores',
-    'snake_scores', 'frogger_scores', 'global_scores'
+    'snake_scores', 'frogger_scores', 'invasores_scores', 'global_scores'
   ] loop
     if not exists (
       select 1 from pg_publication_tables
@@ -410,15 +446,16 @@ $realtime$;
 -- -----------------------------------------------------------------------------
 -- 9. Seed del catálogo
 --
--- Solo los juegos con motor real y leaderboard. Los 5 simulados
--- (serpentina, gloton, invasores, ranaria, duelo-pixel) no van aquí: viven en
--- app/data/games.ts y guardan puntaje en localStorage.
+-- Solo los juegos con motor real y leaderboard. Los simulados que quedan
+-- (gloton, duelo-pixel) no van aquí: viven en app/data/games.ts y guardan
+-- puntaje en localStorage.
 -- -----------------------------------------------------------------------------
 
 insert into "arcade-vault".games (id, title) values
   ('arkanoid',  'ARKANOID'),
   ('asteroids', 'ASTEROIDS'),
   ('frogger',   'FROGGER'),
+  ('invasores', 'INVASORES'),
   ('snake',     'SNAKE'),
   ('tetris',    'TETRIS')
 on conflict (id) do nothing;

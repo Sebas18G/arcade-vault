@@ -10,6 +10,7 @@ const SCORE_TABLE: Record<string, string> = {
   arkanoid: "arkanoid_scores",
   snake: "snake_scores",
   frogger: "frogger_scores",
+  invasores: "invasores_scores",
 };
 type SalonRow = { id: string; name: string; score: number; date: string };
 function formatDate(iso: string): string {
