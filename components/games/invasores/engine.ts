@@ -26,6 +26,17 @@ export const EDGE_MARGIN = 16;
  * orden idéntico a 60Hz y a 144Hz — el motor nunca cuenta frames.
  */
 export const TICK_MS = 1000 / 60;
+/**
+ * Progresión de oleadas. La spec deja el descenso por oleada como "pendiente
+ * de confirmar" con ROW_STEP por oleada y tope tras 8; con ROW_STEP entero la
+ * oleada 6 nacería ya a la altura de los búnkeres y la partida terminaría
+ * sola. Se conserva la rampa de 8 oleadas y se parte el paso a la mitad: la
+ * oleada 8 en adelante nace con su fila inferior 40px sobre los búnkeres.
+ */
+export const WAVE_DROP = ROW_STEP / 2;
+export const WAVE_DROP_MAX_LEVEL = 8;
+/** Vida extra, una sola vez por partida, al alcanzar este puntaje. */
+export const EXTRA_LIFE_SCORE = 1500;
 export const CANNON_Y = 540;
 export const CANNON_W = 40;
 export const CANNON_H = 20;
@@ -61,6 +72,15 @@ export const ROW_POINTS = [30, 20, 20, 10, 10] as const;
 export const UFO_TABLE = [
   50, 50, 100, 150, 100, 100, 50, 300, 100, 100, 100, 50, 150, 100, 100,
 ] as const;
+/**
+ * UFO de bonus. La spec deja "cadencia exacta de aparición y velocidad de
+ * cruce" como pendiente de confirmar y pide fijarlas acá.
+ */
+export const UFO_W = 40;
+export const UFO_H = 18;
+export const UFO_Y = 52; // cruza por encima de FORMATION_TOP
+export const UFO_SPEED = 130; // px/s
+export const UFO_SPAWN_MS = 18000; // tiempo entre apariciones
 /** Búnker como máscara de celdas erosionables, no como rectángulo entero. */
 export const BUNKER_COUNT = 4;
 export const BUNKER_CELL = 3; // px por celda de la máscara
@@ -144,6 +164,15 @@ const SPRITE_OCTOPUS = [
   "...XX..XX...",
   "..XX.XX.XX..",
   "XX........XX",
+];
+const SPRITE_UFO = [
+  ".....XXXXXX.....",
+  "...XXXXXXXXXX...",
+  "..XXXXXXXXXXXX..",
+  ".XX.XX.XX.XX.XX.",
+  "XXXXXXXXXXXXXXXX",
+  "..XXX..XX..XXX..",
+  "...X........X...",
 ];
 const SPRITE_CANNON = [
   "......X......",
@@ -240,8 +269,16 @@ export class InvasoresEngine {
   private playerBullet: Bullet | null = null;
   /** Disparos alienígenas en vuelo; nunca más de MAX_ALIEN_BULLETS. */
   private alienBullets: Bullet[] = [];
+  /** UFO en pantalla, o null entre apariciones. */
+  private ufo: { x: number; dir: 1 | -1 } | null = null;
+  /** ms que faltan para la próxima aparición del UFO. */
+  private ufoSpawnMs = UFO_SPAWN_MS;
+  /** El UFO alterna el lado por el que entra en cada aparición. */
+  private ufoNextDir: 1 | -1 = 1;
   /** ms que faltan para el próximo disparo alienígena. */
   private alienFireMs = ALIEN_FIRE_MS_BASE;
+  /** La vida extra de EXTRA_LIFE_SCORE se otorga una sola vez por partida. */
+  private extraLifeAwarded = false;
   /** Stats acumuladas durante toda la partida; viajan en el game over. */
   private aliensKilled = 0;
   private ufosHit = 0;
@@ -255,6 +292,7 @@ export class InvasoresEngine {
     this.level = 1;
     this.lives = START_LIVES;
     this.screen = "playing";
+    this.extraLifeAwarded = false;
     this.aliensKilled = 0;
     this.ufosHit = 0;
     this.shotsFired = 0;
@@ -267,6 +305,9 @@ export class InvasoresEngine {
     this.playerBullet = null;
     this.alienBullets = [];
     this.alienFireMs = this.alienFireIntervalMs();
+    this.ufo = null;
+    this.ufoSpawnMs = UFO_SPAWN_MS;
+    this.ufoNextDir = 1;
     this.buildFormation();
     this.buildBunkers();
     this.callbacks.onScoreChange(this.score);
@@ -282,8 +323,14 @@ export class InvasoresEngine {
   keyUp(input: InvasoresInput) {
     this.keys[input] = false;
   }
+  /** y de la fila 0 para la oleada actual, con tope en WAVE_DROP_MAX_LEVEL. */
+  private formationTop(): number {
+    const steps = Math.min(this.level, WAVE_DROP_MAX_LEVEL) - 1;
+    return FORMATION_TOP + steps * WAVE_DROP;
+  }
   /** Los 55 invasores en su grilla de 5 filas x 11 columnas. */
   private buildFormation() {
+    const top = this.formationTop();
     this.invaders = [];
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
@@ -291,7 +338,7 @@ export class InvasoresEngine {
           row,
           col,
           x: FORMATION_LEFT + col * COL_STEP,
-          y: FORMATION_TOP + row * ROW_STEP,
+          y: top + row * ROW_STEP,
           alive: true,
         });
       }
@@ -326,7 +373,68 @@ export class InvasoresEngine {
     this.updatePlayerBullet();
     this.updateAlienBullets();
     this.updateAlienFire();
+    this.updateUfo();
     this.crushBunkers();
+    this.checkFormationReachedBunkers();
+    this.checkWaveCleared();
+  }
+  /**
+   * Fin de partida inmediato, sin importar las vidas restantes, si la
+   * formación desciende hasta la altura de los búnkeres.
+   */
+  private checkFormationReachedBunkers() {
+    for (const invader of this.invaders) {
+      if (!invader.alive) continue;
+      if (invader.y + INVADER_H >= BUNKER_Y) {
+        this.gameOver();
+        return;
+      }
+    }
+  }
+  /** Oleada limpia: sube el nivel y regenera la formación más abajo. */
+  private checkWaveCleared() {
+    if (this.invaders.some((invader) => invader.alive)) return;
+    this.level++;
+    this.callbacks.onLevelChange(this.level);
+    this.dir = 1;
+    this.moveIndex = 0;
+    this.pendingDrop = false;
+    this.playerBullet = null;
+    this.alienBullets = [];
+    this.alienFireMs = this.alienFireIntervalMs();
+    this.buildFormation();
+  }
+  /** Vida extra al cruzar el umbral de puntaje, una única vez por partida. */
+  private checkExtraLife() {
+    if (this.extraLifeAwarded || this.score < EXTRA_LIFE_SCORE) return;
+    this.extraLifeAwarded = true;
+    this.lives++;
+    this.callbacks.onLivesChange(this.lives);
+  }
+  private updateUfo() {
+    if (!this.ufo) {
+      this.ufoSpawnMs -= TICK_MS;
+      if (this.ufoSpawnMs > 0) return;
+      this.ufoSpawnMs = UFO_SPAWN_MS;
+      const dir = this.ufoNextDir;
+      this.ufoNextDir = dir === 1 ? -1 : 1;
+      this.ufo = { x: dir === 1 ? -UFO_W : INVASORES_WIDTH, dir };
+      return;
+    }
+    this.ufo.x += (UFO_SPEED * TICK_MS * this.ufo.dir) / 1000;
+    if (this.ufo.x > INVASORES_WIDTH || this.ufo.x + UFO_W < 0) {
+      this.ufo = null;
+    }
+  }
+  /**
+   * Valor del UFO derribado. No es aleatorio: sale de la secuencia fija
+   * `UFO_TABLE`, indexada por el número ordinal del disparo que lo derriba.
+   * `shotsFired` ya cuenta el disparo en vuelo, así que el índice del disparo
+   * n-ésimo es `n - 1`: el disparo 23 cae en `UFO_TABLE[7]` = 300 puntos, que
+   * es el truco clásico del arcade y el criterio de aceptación de la spec.
+   */
+  private ufoValue(): number {
+    return UFO_TABLE[(this.shotsFired - 1) % UFO_TABLE.length];
   }
   /** Cadencia de disparo alienígena para la oleada actual, en ms. */
   private alienFireIntervalMs(): number {
@@ -536,6 +644,22 @@ export class InvasoresEngine {
       this.playerBullet = null;
       return;
     }
+    if (
+      this.ufo &&
+      bullet.x + BULLET_W >= this.ufo.x &&
+      bullet.x <= this.ufo.x + UFO_W &&
+      bullet.y <= UFO_Y + UFO_H &&
+      bullet.y + BULLET_H >= UFO_Y
+    ) {
+      this.score += this.ufoValue();
+      this.ufosHit++;
+      this.callbacks.onScoreChange(this.score);
+      this.checkExtraLife();
+      this.ufo = null;
+      this.ufoSpawnMs = UFO_SPAWN_MS;
+      this.playerBullet = null;
+      return;
+    }
     if (this.hitBunker(bullet.x, bullet.y, BULLET_W, BULLET_H, BLAST_PLAYER, -1)) {
       this.playerBullet = null;
       return;
@@ -554,6 +678,7 @@ export class InvasoresEngine {
       this.aliensKilled++;
       this.score += ROW_POINTS[invader.row];
       this.callbacks.onScoreChange(this.score);
+      this.checkExtraLife();
       this.playerBullet = null;
       return;
     }
@@ -594,6 +719,17 @@ export class InvasoresEngine {
   draw(ctx: CanvasRenderingContext2D) {
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, INVASORES_WIDTH, INVASORES_HEIGHT);
+    if (this.ufo) {
+      drawSprite(
+        ctx,
+        SPRITE_UFO,
+        this.ufo.x,
+        UFO_Y,
+        UFO_W,
+        UFO_H,
+        COLORS.ufo,
+      );
+    }
     this.drawInvaders(ctx);
     this.drawBunkers(ctx);
     this.drawCannon(ctx);
