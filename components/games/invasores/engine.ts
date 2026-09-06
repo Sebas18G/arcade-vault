@@ -29,6 +29,28 @@ export const TICK_MS = 1000 / 60;
 export const CANNON_Y = 540;
 export const CANNON_W = 40;
 export const CANNON_H = 20;
+/** Velocidad horizontal del canon, en px/s. */
+export const CANNON_SPEED = 320;
+/** Proyectil del jugador: uno solo en pantalla a la vez. */
+export const BULLET_W = 3;
+export const BULLET_H = 12;
+export const BULLET_SPEED = 620; // px/s hacia arriba
+/**
+ * Disparos alienígenas. La spec deja la cadencia exacta del original como
+ * "pendiente de confirmar" (el arcade usa tablas de columnas preferidas por
+ * tipo de disparo) y pide fijar los valores acá. Regla implementada: columna
+ * viva al azar, siempre el invasor más bajo de esa columna, máximo 3 en
+ * pantalla. Cadencia y velocidad escalan con el nivel hasta un tope, para que
+ * la oleada 10 sea difícil y no imposible.
+ */
+export const ALIEN_BULLET_W = 3;
+export const ALIEN_BULLET_H = 12;
+export const ALIEN_BULLET_SPEED_BASE = 200; // px/s en la oleada 1
+export const ALIEN_BULLET_SPEED_STEP = 26; // px/s extra por oleada
+export const ALIEN_BULLET_SPEED_MAX = 420;
+export const ALIEN_FIRE_MS_BASE = 900; // ms entre disparos en la oleada 1
+export const ALIEN_FIRE_MS_STEP = 80; // ms menos por oleada
+export const ALIEN_FIRE_MS_MIN = 260;
 export const BUNKER_Y = 460; // si la formación llega aquí, game over inmediato
 export const GROUND_Y = 570;
 export const START_LIVES = 3;
@@ -44,11 +66,18 @@ export const BUNKER_COUNT = 4;
 export const BUNKER_CELL = 3; // px por celda de la máscara
 export const BUNKER_COLS = 22; // 66px de ancho
 export const BUNKER_ROWS = 16; // 48px de alto
+/** Radio del cráter, en celdas. El disparo alienígena erosiona más. */
+export const BLAST_PLAYER = 2;
+export const BLAST_ALIEN = 3;
+export const BUNKER_W = BUNKER_COLS * BUNKER_CELL;
+export const BUNKER_H = BUNKER_ROWS * BUNKER_CELL;
 type Bunker = {
   x: number;
   y: number;
   /** true = celda intacta. Un impacto apaga las celdas dentro de un radio. */
   cells: boolean[][];
+  /** Ya arrasado por un invasor: evita rebarrer la máscara en cada tick. */
+  crushed: boolean;
 };
 type Invader = {
   row: number; // fija la especie y los puntos vía ROW_POINTS
@@ -57,6 +86,9 @@ type Invader = {
   y: number;
   alive: boolean;
 };
+/** Entradas normalizadas por el wrapper: el motor nunca ve un KeyboardEvent. */
+export type InvasoresInput = "LEFT" | "RIGHT" | "FIRE";
+type Bullet = { x: number; y: number };
 export type InvasoresEngineCallbacks = {
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
@@ -76,6 +108,8 @@ const COLORS = {
   /** Un color por fila, alineado con ROW_POINTS: 30 / 20 / 20 / 10 / 10. */
   rows: ["#7df9ff", "#39ff14", "#39ff14", "#ffd166", "#ffd166"] as const,
   ufo: "#ff2e88",
+  playerBullet: "#eaffea",
+  alienBullet: "#ff6b6b",
 };
 /**
  * Sprites procedurales: cada especie es un bitmap de texto que se pinta con
@@ -196,6 +230,18 @@ export class InvasoresEngine {
   private pendingDrop = false;
   /** Resto de tiempo acumulado sin consumir por el tick lógico. */
   private accMs = 0;
+  /** Estado de las teclas mantenidas; lo alimenta el wrapper. */
+  private keys: Record<InvasoresInput, boolean> = {
+    LEFT: false,
+    RIGHT: false,
+    FIRE: false,
+  };
+  /** null = no hay disparo del jugador en vuelo, así que se puede disparar. */
+  private playerBullet: Bullet | null = null;
+  /** Disparos alienígenas en vuelo; nunca más de MAX_ALIEN_BULLETS. */
+  private alienBullets: Bullet[] = [];
+  /** ms que faltan para el próximo disparo alienígena. */
+  private alienFireMs = ALIEN_FIRE_MS_BASE;
   /** Stats acumuladas durante toda la partida; viajan en el game over. */
   private aliensKilled = 0;
   private ufosHit = 0;
@@ -217,6 +263,10 @@ export class InvasoresEngine {
     this.moveIndex = 0;
     this.pendingDrop = false;
     this.accMs = 0;
+    this.keys = { LEFT: false, RIGHT: false, FIRE: false };
+    this.playerBullet = null;
+    this.alienBullets = [];
+    this.alienFireMs = this.alienFireIntervalMs();
     this.buildFormation();
     this.buildBunkers();
     this.callbacks.onScoreChange(this.score);
@@ -225,6 +275,12 @@ export class InvasoresEngine {
   }
   setPaused(paused: boolean) {
     this.paused = paused;
+  }
+  keyDown(input: InvasoresInput) {
+    this.keys[input] = true;
+  }
+  keyUp(input: InvasoresInput) {
+    this.keys[input] = false;
   }
   /** Los 55 invasores en su grilla de 5 filas x 11 columnas. */
   private buildFormation() {
@@ -244,13 +300,13 @@ export class InvasoresEngine {
   /** Los 4 búnkeres, repartidos en cuartos iguales del ancho del canvas. */
   private buildBunkers() {
     const slot = INVASORES_WIDTH / BUNKER_COUNT;
-    const width = BUNKER_COLS * BUNKER_CELL;
     this.bunkers = [];
     for (let i = 0; i < BUNKER_COUNT; i++) {
       this.bunkers.push({
-        x: Math.round(slot * i + (slot - width) / 2),
+        x: Math.round(slot * i + (slot - BUNKER_W) / 2),
         y: BUNKER_Y,
         cells: buildBunkerCells(),
+        crushed: false,
       });
     }
   }
@@ -261,7 +317,245 @@ export class InvasoresEngine {
     this.accMs = Math.min(this.accMs + dt, 200);
     while (this.accMs >= TICK_MS) {
       this.accMs -= TICK_MS;
-      this.stepFormation();
+      this.tick();
+    }
+  }
+  private tick() {
+    this.stepFormation();
+    this.updateCannon();
+    this.updatePlayerBullet();
+    this.updateAlienBullets();
+    this.updateAlienFire();
+    this.crushBunkers();
+  }
+  /** Cadencia de disparo alienígena para la oleada actual, en ms. */
+  private alienFireIntervalMs(): number {
+    return Math.max(
+      ALIEN_FIRE_MS_MIN,
+      ALIEN_FIRE_MS_BASE - (this.level - 1) * ALIEN_FIRE_MS_STEP,
+    );
+  }
+  /** Velocidad de los disparos alienígenas para la oleada actual, en px/s. */
+  private alienBulletSpeed(): number {
+    return Math.min(
+      ALIEN_BULLET_SPEED_MAX,
+      ALIEN_BULLET_SPEED_BASE + (this.level - 1) * ALIEN_BULLET_SPEED_STEP,
+    );
+  }
+  private updateAlienFire() {
+    this.alienFireMs -= TICK_MS;
+    if (this.alienFireMs > 0) return;
+    this.alienFireMs = this.alienFireIntervalMs();
+    if (this.alienBullets.length >= MAX_ALIEN_BULLETS) return;
+    const shooter = this.pickShooter();
+    if (!shooter) return;
+    this.alienBullets.push({
+      x: shooter.x + INVADER_W / 2 - ALIEN_BULLET_W / 2,
+      y: shooter.y + INVADER_H,
+    });
+  }
+  /** Invasor más bajo de una columna con invasores vivos, elegida al azar. */
+  private pickShooter(): Invader | null {
+    const columns = new Set<number>();
+    for (const invader of this.invaders) {
+      if (invader.alive) columns.add(invader.col);
+    }
+    if (columns.size === 0) return null;
+    const pool = [...columns];
+    const col = pool[Math.floor(Math.random() * pool.length)];
+    let lowest: Invader | null = null;
+    for (const invader of this.invaders) {
+      if (!invader.alive || invader.col !== col) continue;
+      if (!lowest || invader.y > lowest.y) lowest = invader;
+    }
+    return lowest;
+  }
+  private updateAlienBullets() {
+    const step = (this.alienBulletSpeed() * TICK_MS) / 1000;
+    for (let i = this.alienBullets.length - 1; i >= 0; i--) {
+      const bullet = this.alienBullets[i];
+      bullet.y += step;
+      if (bullet.y > INVASORES_HEIGHT) {
+        this.alienBullets.splice(i, 1);
+        continue;
+      }
+      if (
+        this.hitBunker(
+          bullet.x,
+          bullet.y,
+          ALIEN_BULLET_W,
+          ALIEN_BULLET_H,
+          BLAST_ALIEN,
+          1,
+        )
+      ) {
+        this.alienBullets.splice(i, 1);
+        continue;
+      }
+      if (
+        bullet.x + ALIEN_BULLET_W >= this.cannonX &&
+        bullet.x <= this.cannonX + CANNON_W &&
+        bullet.y + ALIEN_BULLET_H >= CANNON_Y &&
+        bullet.y <= CANNON_Y + CANNON_H
+      ) {
+        this.alienBullets.splice(i, 1);
+        this.loseLife();
+        return;
+      }
+    }
+  }
+  /**
+   * Impacto de un proyectil contra los búnkeres. `dirY` es hacia dónde viaja
+   * el disparo (-1 sube, 1 baja): se busca la primera celda intacta desde el
+   * lado por el que entra, para que un hueco ya abierto lo deje pasar.
+   * Devuelve true si erosionó algo, y entonces el disparo se consume.
+   */
+  private hitBunker(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    radius: number,
+    dirY: -1 | 1,
+  ): boolean {
+    for (const bunker of this.bunkers) {
+      if (
+        x + w < bunker.x ||
+        x > bunker.x + BUNKER_W ||
+        y + h < bunker.y ||
+        y > bunker.y + BUNKER_H
+      ) {
+        continue;
+      }
+      const c0 = Math.max(0, Math.floor((x - bunker.x) / BUNKER_CELL));
+      const c1 = Math.min(
+        BUNKER_COLS - 1,
+        Math.floor((x + w - bunker.x) / BUNKER_CELL),
+      );
+      const r0 = Math.max(0, Math.floor((y - bunker.y) / BUNKER_CELL));
+      const r1 = Math.min(
+        BUNKER_ROWS - 1,
+        Math.floor((y + h - bunker.y) / BUNKER_CELL),
+      );
+      // El disparo que sube entra por abajo, así que se recorre de r1 a r0.
+      const from = dirY === -1 ? r1 : r0;
+      const to = dirY === -1 ? r0 : r1;
+      for (let r = from; dirY === -1 ? r >= to : r <= to; r += dirY) {
+        for (let c = c0; c <= c1; c++) {
+          if (!bunker.cells[r][c]) continue;
+          this.eraseBunkerCells(bunker, c, r, radius);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  /** Apaga las celdas dentro de un radio circular del punto de impacto. */
+  private eraseBunkerCells(
+    bunker: Bunker,
+    cx: number,
+    cy: number,
+    radius: number,
+  ) {
+    for (let r = cy - radius; r <= cy + radius; r++) {
+      for (let c = cx - radius; c <= cx + radius; c++) {
+        if (r < 0 || r >= BUNKER_ROWS || c < 0 || c >= BUNKER_COLS) continue;
+        const dx = c - cx;
+        const dy = r - cy;
+        if (dx * dx + dy * dy > radius * radius + radius) continue;
+        bunker.cells[r][c] = false;
+      }
+    }
+  }
+  /**
+   * Un invasor que alcanza un búnker lo arrasa entero. Se evalúa en cada tick
+   * y no solo al bajar la formación: el invasor también lo puede atravesar
+   * lateralmente, barriendo a la altura del búnker.
+   */
+  private crushBunkers() {
+    for (const bunker of this.bunkers) {
+      if (bunker.crushed) continue;
+      for (const invader of this.invaders) {
+        if (!invader.alive) continue;
+        if (
+          invader.x + INVADER_W < bunker.x ||
+          invader.x > bunker.x + BUNKER_W ||
+          invader.y + INVADER_H < bunker.y ||
+          invader.y > bunker.y + BUNKER_H
+        ) {
+          continue;
+        }
+        bunker.cells = bunker.cells.map((row) => row.map(() => false));
+        bunker.crushed = true;
+        break;
+      }
+    }
+  }
+  /** Un impacto en el cañón: limpia la pantalla de disparos y recentra. */
+  private loseLife() {
+    this.lives--;
+    this.callbacks.onLivesChange(this.lives);
+    this.alienBullets = [];
+    this.playerBullet = null;
+    this.cannonX = (INVASORES_WIDTH - CANNON_W) / 2;
+    if (this.lives <= 0) this.gameOver();
+  }
+  private gameOver() {
+    this.screen = "gameover";
+    this.callbacks.onGameOver({
+      score: this.score,
+      level: this.level,
+      aliensKilled: this.aliensKilled,
+      ufosHit: this.ufosHit,
+      shotsFired: this.shotsFired,
+    });
+  }
+  private updateCannon() {
+    const step = (CANNON_SPEED * TICK_MS) / 1000;
+    if (this.keys.LEFT) this.cannonX -= step;
+    if (this.keys.RIGHT) this.cannonX += step;
+    this.cannonX = Math.max(
+      EDGE_MARGIN,
+      Math.min(INVASORES_WIDTH - EDGE_MARGIN - CANNON_W, this.cannonX),
+    );
+    // Un solo proyectil en pantalla: mientras haya uno en vuelo, FIRE no hace
+    // nada. Mantener la tecla vuelve a disparar en cuanto el anterior se va.
+    if (this.keys.FIRE && !this.playerBullet) {
+      this.playerBullet = {
+        x: this.cannonX + CANNON_W / 2 - BULLET_W / 2,
+        y: CANNON_Y - BULLET_H,
+      };
+      this.shotsFired++;
+    }
+  }
+  private updatePlayerBullet() {
+    const bullet = this.playerBullet;
+    if (!bullet) return;
+    bullet.y -= (BULLET_SPEED * TICK_MS) / 1000;
+    if (bullet.y + BULLET_H < 0) {
+      this.playerBullet = null;
+      return;
+    }
+    if (this.hitBunker(bullet.x, bullet.y, BULLET_W, BULLET_H, BLAST_PLAYER, -1)) {
+      this.playerBullet = null;
+      return;
+    }
+    for (const invader of this.invaders) {
+      if (!invader.alive) continue;
+      if (
+        bullet.x + BULLET_W < invader.x ||
+        bullet.x > invader.x + INVADER_W ||
+        bullet.y + BULLET_H < invader.y ||
+        bullet.y > invader.y + INVADER_H
+      ) {
+        continue;
+      }
+      invader.alive = false;
+      this.aliensKilled++;
+      this.score += ROW_POINTS[invader.row];
+      this.callbacks.onScoreChange(this.score);
+      this.playerBullet = null;
+      return;
     }
   }
   /**
@@ -303,6 +597,19 @@ export class InvasoresEngine {
     this.drawInvaders(ctx);
     this.drawBunkers(ctx);
     this.drawCannon(ctx);
+    if (this.playerBullet) {
+      ctx.fillStyle = COLORS.playerBullet;
+      ctx.fillRect(
+        this.playerBullet.x,
+        this.playerBullet.y,
+        BULLET_W,
+        BULLET_H,
+      );
+    }
+    ctx.fillStyle = COLORS.alienBullet;
+    for (const bullet of this.alienBullets) {
+      ctx.fillRect(bullet.x, bullet.y, ALIEN_BULLET_W, ALIEN_BULLET_H);
+    }
     ctx.fillStyle = COLORS.ground;
     ctx.fillRect(0, GROUND_Y, INVASORES_WIDTH, 2);
   }
