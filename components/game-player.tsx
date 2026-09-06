@@ -6,12 +6,21 @@ import { addScore } from "@/lib/storage";
 import type {
   AsteroidsGameOverResult,
   FroggerGameOverResult,
+  InvasoresGameOverResult,
   GameCanvasHandle,
   GameOverResult,
   LeaderboardEntry,
   TetrisGameOverResult,
 } from "@/components/games/shared/types";
 import { GAME_SKINS, type GameSkin } from "@/components/games/shared/skins";
+import type { GamepadLayout } from "@/components/games/shared/controls";
+import { MobileGamepad } from "@/components/mobile-gamepad";
+import { ASTEROIDS_GAMEPAD } from "@/components/games/asteroids/controls";
+import { TETRIS_GAMEPAD } from "@/components/games/tetris/controls";
+import { ARKANOID_GAMEPAD } from "@/components/games/arkanoid/controls";
+import { SNAKE_GAMEPAD } from "@/components/games/snake/controls";
+import { FROGGER_GAMEPAD } from "@/components/games/frogger/controls";
+import { INVASORES_GAMEPAD } from "@/components/games/invasores/controls";
 import { AsteroidsCanvas } from "@/components/games/asteroids/asteroids-canvas";
 import {
   addAsteroidsScore,
@@ -34,6 +43,8 @@ import { ArkanoidCanvas } from "@/components/games/arkanoid/arkanoid-canvas";
 import {
   addArkanoidScore,
   getArkanoidLeaderboard,
+  getArkanoidSkin,
+  setArkanoidSkin,
 } from "@/components/games/arkanoid/leaderboard";
 import { SnakeCanvas } from "@/components/games/snake/snake-canvas";
 import {
@@ -43,12 +54,19 @@ import {
   setSnakeSkin,
 } from "@/components/games/snake/leaderboard";
 import { FroggerCanvas } from "@/components/games/frogger/frogger-canvas";
+import { InvasoresCanvas } from "@/components/games/invasores/invasores-canvas";
 import {
   addFroggerScore,
   getFroggerLeaderboard,
   getFroggerSkin,
   setFroggerSkin,
 } from "@/components/games/frogger/leaderboard";
+import {
+  addInvasoresScore,
+  getInvasoresLeaderboard,
+  getInvasoresSkin,
+  setInvasoresSkin,
+} from "@/components/games/invasores/leaderboard";
 const LIVES = 3;
 const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
   { value: "retro", label: "Retro" },
@@ -60,12 +78,13 @@ type SkinOption = { value: string; label: string };
 // Registro de skins por juego: el botón "SKIN" del HUD se renderiza para
 // cualquier juego presente aquí. Tetris conserva sus 4 skins propias; los
 // juegos migrados al contrato compartido usan las 3 de GAME_SKINS.
-// (arkanoid todavía no tiene skins: por eso no figura).
 const SKINS_BY_GAME: Record<string, SkinOption[]> = {
   tetris: TETRIS_SKINS,
   asteroids: GAME_SKINS,
   snake: GAME_SKINS,
   frogger: GAME_SKINS,
+  arkanoid: GAME_SKINS,
+  invasores: GAME_SKINS,
 };
 // Lectura/escritura de la preferencia, delegada al leaderboard.ts de cada juego.
 // Ambas claves son "<gameId>-skin" ("tetris-skin" es la que Tetris ya usaba,
@@ -90,6 +109,25 @@ const SKIN_STORAGE: Record<
     read: getFroggerSkin,
     write: (value) => setFroggerSkin(value as GameSkin),
   },
+  arkanoid: {
+    read: getArkanoidSkin,
+    write: (value) => setArkanoidSkin(value as GameSkin),
+  },
+  invasores: {
+    read: getInvasoresSkin,
+    write: (value) => setInvasoresSkin(value as GameSkin),
+  },
+};
+// Registro de gamepads táctiles (spec 16): el gamepad se renderiza para
+// cualquier juego presente aquí. Los 2 juegos simulados (gloton, duelo-pixel)
+// no tienen motor ni entrada, así que no aparecen.
+const GAMEPAD_BY_GAME: Record<string, GamepadLayout> = {
+  asteroids: ASTEROIDS_GAMEPAD,
+  tetris: TETRIS_GAMEPAD,
+  arkanoid: ARKANOID_GAMEPAD,
+  snake: SNAKE_GAMEPAD,
+  frogger: FROGGER_GAMEPAD,
+  invasores: INVASORES_GAMEPAD,
 };
 function GameOverModal({
   game,
@@ -255,8 +293,14 @@ export function GamePlayer({
   const isArkanoid = game.id === "arkanoid";
   const isSnake = game.id === "snake";
   const isFrogger = game.id === "frogger";
+  const isInvasores = game.id === "invasores";
   const isPortedGame =
-    isAsteroids || isTetris || isArkanoid || isSnake || isFrogger;
+    isAsteroids ||
+    isTetris ||
+    isArkanoid ||
+    isSnake ||
+    isFrogger ||
+    isInvasores;
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(LIVES);
   const [engineLevel, setEngineLevel] = useState(1);
@@ -273,6 +317,8 @@ export function GamePlayer({
   const [snakeResult, setSnakeResult] = useState<GameOverResult | null>(null);
   const [froggerResult, setFroggerResult] =
     useState<FroggerGameOverResult | null>(null);
+  const [invasoresResult, setInvasoresResult] =
+    useState<InvasoresGameOverResult | null>(null);
   const [leaderboardEntries, setLeaderboardEntries] = useState<
     LeaderboardEntry[]
   >([]);
@@ -284,6 +330,7 @@ export function GamePlayer({
   // y se corrigen en un useEffect post-hidratación para no producir un
   // hydration mismatch cuando el usuario ya tenía guardada otra preferencia.
   const skinOptions = SKINS_BY_GAME[game.id];
+  const gamepadLayout = GAMEPAD_BY_GAME[game.id];
   const [skin, setSkinState] = useState<string>(
     () => skinOptions?.[0]?.value ?? "classic",
   );
@@ -332,6 +379,7 @@ export function GamePlayer({
     setArkanoidResult(null);
     setSnakeResult(null);
     setFroggerResult(null);
+    setInvasoresResult(null);
     setLeaderboardEntries([]);
     setLeaderboardLoading(false);
     setLeaderboardFetchError(null);
@@ -413,6 +461,21 @@ export function GamePlayer({
     setOver(true);
     loadFroggerLeaderboard();
   };
+  const loadInvasoresLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardFetchError(null);
+    getInvasoresLeaderboard()
+      .then(setLeaderboardEntries)
+      .catch(() =>
+        setLeaderboardFetchError("No se pudieron cargar las puntuaciones."),
+      )
+      .finally(() => setLeaderboardLoading(false));
+  };
+  const handleInvasoresGameOver = (result: InvasoresGameOverResult) => {
+    setInvasoresResult(result);
+    setOver(true);
+    loadInvasoresLeaderboard();
+  };
   const handleForceEnd = () => {
     if (isAsteroids) {
       setAsteroidsResult({
@@ -443,6 +506,16 @@ export function GamePlayer({
         timeBonus: 0,
       });
       loadFroggerLeaderboard();
+    }
+    if (isInvasores) {
+      setInvasoresResult({
+        score,
+        level: engineLevel,
+        aliensKilled: 0,
+        ufosHit: 0,
+        shotsFired: 0,
+      });
+      loadInvasoresLeaderboard();
     }
     setOver(true);
   };
@@ -527,6 +600,7 @@ export function GamePlayer({
             <ArkanoidCanvas
               ref={canvasRef}
               paused={paused || over}
+              skin={skin as GameSkin}
               onScoreChange={setScore}
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
@@ -551,6 +625,16 @@ export function GamePlayer({
               onLivesChange={setLives}
               onLevelChange={setEngineLevel}
               onGameOver={handleFroggerGameOver}
+            />
+          ) : isInvasores ? (
+            <InvasoresCanvas
+              ref={canvasRef}
+              paused={paused || over}
+              skin={skin as GameSkin}
+              onScoreChange={setScore}
+              onLivesChange={setLives}
+              onLevelChange={setEngineLevel}
+              onGameOver={handleInvasoresGameOver}
             />
           ) : (
             <div className="game-arena">
@@ -591,6 +675,26 @@ export function GamePlayer({
           <span>CARGA · 1MB</span>
         </div>
       </div>
+      {/* Controles táctiles (spec 16). El CSS decide si se ven: solo con
+          puntero grueso o viewport angosto. Publica teclas sintéticas en
+          `window`, donde los canvas ya escuchan — ningún motor se entera. */}
+      {gamepadLayout && (
+        <MobileGamepad
+          layout={gamepadLayout}
+          locked={paused || over}
+          paused={paused}
+          onPauseToggle={() => setPaused((p) => !p)}
+          onForceEnd={handleForceEnd}
+          skinLabel={
+            skinOptions
+              ? (skinOptions.find((s) => s.value === skin)?.label ??
+                skinOptions[0].label)
+              : null
+          }
+          onSkinCycle={skinOptions ? cycleSkin : undefined}
+          backHref={`/games/${game.id}`}
+        />
+      )}
       {over && (
         <GameOverModal
           game={game}
@@ -605,7 +709,9 @@ export function GamePlayer({
                     ? (snakeResult?.score ?? score)
                     : isFrogger
                       ? (froggerResult?.score ?? score)
-                      : score
+                      : isInvasores
+                        ? (invasoresResult?.score ?? score)
+                        : score
           }
           level={
             isAsteroids
@@ -618,7 +724,9 @@ export function GamePlayer({
                     ? (snakeResult?.level ?? engineLevel)
                     : isFrogger
                       ? (froggerResult?.level ?? engineLevel)
-                      : undefined
+                      : isInvasores
+                        ? (invasoresResult?.level ?? engineLevel)
+                        : undefined
           }
           name={playerName}
           leaderboard={
@@ -698,7 +806,27 @@ export function GamePlayer({
                             setLeaderboardEntries(entries);
                           },
                         }
-                      : undefined
+                      : isInvasores
+                        ? {
+                            entries: leaderboardEntries,
+                            loading: leaderboardLoading,
+                            fetchError: leaderboardFetchError,
+                            onSaveName: async (name) => {
+                              const result = invasoresResult ?? {
+                                score,
+                                level: engineLevel,
+                                aliensKilled: 0,
+                                ufosHit: 0,
+                                shotsFired: 0,
+                              };
+                              const entries = await addInvasoresScore(
+                                name,
+                                result,
+                              );
+                              setLeaderboardEntries(entries);
+                            },
+                          }
+                        : undefined
           }
           onRestart={restart}
         />

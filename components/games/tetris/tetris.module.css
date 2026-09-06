@@ -215,3 +215,37 @@
   font-size: 11px;
   letter-spacing: 0;
 }
+/* Mobile (spec 16): tablero (300 px) + panel (140 px) + separación no entran en
+   un teléfono. El panel se estrecha y se fija para que el que encoja sea el
+   tablero, que escala solo gracias a `max-width: 100%` sobre el canvas. */
+@media (max-width: 700px) {
+  .container {
+    padding: 8px;
+    gap: 8px;
+  }
+  .gameRow {
+    gap: 10px;
+  }
+  .boardWrap {
+    min-width: 0;
+  }
+  .panel {
+    flex: 0 0 76px;
+    width: 76px;
+    gap: 10px;
+  }
+  .label {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+  .value {
+    font-size: 15px;
+  }
+  .nextCanvas {
+    width: 100%;
+    height: auto;
+  }
+  .nextLabel {
+    font-size: 9px;
+  }
+}

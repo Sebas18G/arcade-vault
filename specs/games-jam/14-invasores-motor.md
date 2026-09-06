@@ -1,6 +1,6 @@
 # SPEC 14 — Invasores real: motor de canvas que reemplaza el reproductor simulado de `invasores`
 
-> **Status:** Aprobado
+> **Status:** Implementado
 > **Depends on:** SPEC 01, SPEC 05
 > **Date:** 2026-09-05
 > **Objective:** Construir un motor real de canvas para Space Invaders (formación de 5×11 invasores, 4 búnkeres destructibles, UFO de bonus y oleadas infinitas) que reemplaza el reproductor simulado de la entrada `invasores` del catálogo, todavía sin persistencia.
@@ -24,11 +24,12 @@ El trabajo se parte en **dos** specs (14 y 15), siguiendo el precedente de Frogg
   - **Un solo proyectil del jugador en pantalla a la vez**: no se puede volver a disparar hasta que el anterior impacta o sale por arriba. Ver Decisions.
   - **Disparos alienígenas:** hasta 3 simultáneos en pantalla, cada uno originado en el invasor **más bajo** de una columna con invasores vivos, elegida al azar. Cadencia y velocidad escalan con el nivel.
   - **4 búnkeres destructibles**, erosionables disparo a disparo por **ambos** bandos, y arrasados si un invasor los atraviesa. Se modelan como máscara de celdas, no como rectángulo entero. Ver Data model.
-  - **UFO de bonus** que cruza la parte superior cada cierto tiempo. Su valor **no es aleatorio**: recorre la secuencia fija `(50,50,100,150,100,100,50,300,100,100,100,50,150,100,100)` indexada por el número de disparos del jugador (`shotsFired % 15`).
+  - **UFO de bonus** que cruza la parte superior cada cierto tiempo. Su valor **no es aleatorio**: recorre la secuencia fija `(50,50,100,150,100,100,50,300,100,100,100,50,150,100,100)` indexada por el ordinal del disparo que lo derriba (`(shotsFired - 1) % 15`, ver Decisions).
   - **3 vidas.** Se pierde una cuando un disparo alienígena impacta el cañón.
   - **Fin de partida inmediato** (sin importar las vidas restantes) si la formación desciende hasta la altura de los búnkeres.
   - **Oleadas infinitas:** al limpiar los 55 invasores sube el nivel, la formación se regenera **más abajo** que la anterior (con tope, ver Decisions) y los disparos alienígenas se aceleran. `level` empieza en 1 y no tiene tope.
   - **Vida extra** al alcanzar cierto puntaje una única vez en la partida.
+- **Explosión del cañón al perder una vida** (agregado al alcance a pedido explícito durante la implementación, ver Decisions): el cañón se dibuja destruido con dos fotogramas de restos que alternan, y la partida entera — formación, disparos y UFO — se congela durante `DEATH_MS`. Al terminar reaparece centrado, o se emite el game over si era la última vida.
   - Stats acumuladas durante toda la partida y expuestas en el resultado: `aliensKilled`, `ufosHit` y `shotsFired`.
 - `components/games/shared/types.ts`: `InvasoresGameOverResult = GameOverResult & { aliensKilled: number; ufosHit: number; shotsFired: number }`.
 - `components/games/invasores/invasores-canvas.tsx`: wrapper `forwardRef<GameCanvasHandle, GameCanvasProps<InvasoresGameOverResult>>` siguiendo el contrato de `recipe.md` (`callbacksRef`, listeners de teclado en `useEffect` mount-only con guard de `document.activeElement?.tagName === "INPUT"`, cleanup que cancela el RAF y remueve listeners, `useImperativeHandle` para `restart`).
@@ -66,7 +67,7 @@ export const COL_STEP = 48; // 11 * 48 - 16 = 512px de formación
 export const ROW_STEP = 40;
 
 export const FORMATION_TOP = 96; // y de la fila 0 en la oleada 1
-export const STEP_X = 2; // px que avanza un invasor por paso
+export const STEP_X = 7; // px que avanza un invasor por paso (ver Decisions)
 export const STEP_DOWN = 8; // px que baja la formación al tocar un borde
 
 export const CANNON_Y = 540;
@@ -170,10 +171,14 @@ export type InvasoresGameOverResult = GameOverResult & {
 - **No:** sin sonido. El bajo de cuatro notas que acelera con la formación es parte de la identidad del juego, pero ningún juego del repo tiene audio y esta spec no va a ser la primera en abrir ese frente.
 - **No:** esta spec no toca Supabase ni `localStorage`. La separación limpia entre motor y persistencia es lo que hace que la spec 14 sea commiteable sola.
 - **No:** sin skins en esta spec. El precedente de Frogger es que el motor nace con paleta fija y el agente `skin-designer` agrega `skins.ts`, `setSkin()` y la prop `skin` en una pasada posterior. Adelantarlo aquí duplicaría ese trabajo.
-- **Decisión pendiente de confirmar — descenso por oleada:** la formación de la oleada N empieza `ROW_STEP` más abajo que la de la N−1, con tope tras 8 oleadas. La ficha marca "cuántas filas baja cada oleada nueva y si hay tope" como no confirmado; el tope existe porque sin él la oleada 12 nacería ya dentro de los búnkeres, haciendo el juego imposible por construcción y no por dificultad.
+- **Confirmado durante la implementación — descenso por oleada:** la formación de la oleada N empieza `WAVE_DROP` = `ROW_STEP / 2` = 20px más abajo que la de la N−1, con tope tras 8 oleadas (`WAVE_DROP_MAX_LEVEL`). Con `ROW_STEP` entero (40px) la cuenta no cierra en este canvas: la base de la formación nace en `280 + (N−1)*40` y alcanza `BUNKER_Y` = 460 en la **oleada 6**, que terminaría la partida sola al aparecer. Con 20px la oleada 8 en adelante nace con su fila inferior 40px sobre los búnkeres. La ficha marca "cuántas filas baja cada oleada nueva y si hay tope" como no confirmado; el tope existe porque sin él la oleada 12 nacería ya dentro de los búnkeres, haciendo el juego imposible por construcción y no por dificultad.
 - **Decisión pendiente de confirmar — vida extra:** se otorga una única vida extra a los **1500 puntos**. La ficha marca "si hay vida extra por puntaje" como no confirmado; el original lo dejaba en un DIP switch del operador con 1000 o 1500 como opciones, y se toma 1500.
-- **Pendiente de confirmar:** frecuencia y algoritmo exactos de disparo de los invasores en el original (el arcade usa tablas de columnas preferidas por tipo de disparo). Esta spec fija "columna viva al azar, invasor más bajo, máximo 3 simultáneos"; los valores concretos de cadencia se ajustan durante la implementación y quedan documentados en `engine.ts`.
-- **Pendiente de confirmar:** cadencia exacta de aparición del UFO y su velocidad de cruce.
+- **Confirmado durante la implementación — `STEP_X` = 7, no 2:** los 2px del arcade original se miden sobre una pantalla de 224px de ancho; este canvas mide 800px. Sin reescalar por ese factor (800/224 ≈ 3.57), un barrido con la formación completa tarda ~2 minutos y el primer minuto y medio de cada oleada es prácticamente estático. Medido headless: con `STEP_X` = 2 la formación llena avanza a 2.1 px/s; con 7, a 7.2 px/s (y el último invasor vivo, a 410 px/s). La arquitectura de "un invasor por tick lógico a 60Hz" no cambia.
+- **Confirmado durante la implementación — el índice del UFO es `(shotsFired - 1) % 15`:** `shotsFired` ya contabiliza el disparo en vuelo, así que `shotsFired % 15` haría que los 300 puntos cayeran en el disparo **22**, contradiciendo tanto el criterio de aceptación como el truco clásico del disparo 23 citado más arriba. Indexar por el ordinal del disparo (`n - 1`) deja el disparo 23 en `UFO_TABLE[7]` = 300.
+- **Agregado al alcance durante la implementación — explosión del cañón:** la spec original no contemplaba ninguna animación de muerte y `loseLife()` resolvía todo en el mismo tick. Se agregó a pedido explícito del autor de la spec, ya con los 19 criterios de aceptación cumplidos. `loseLife()` ahora descuenta la vida en el acto (el HUD no se demora) y arranca la animación; el recentrado del cañón y el `onGameOver` de la última vida ocurren al terminarla. La explosión del invasor derribado y el cartel con el valor del UFO **siguen fuera de alcance**.
+- **Confirmado durante la implementación — el arrasado de búnkeres se evalúa en cada tick**, no solo al bajar la formación: un invasor también puede atravesar un búnker lateralmente, barriendo a su altura, y la spec dice "atraviesa", no "desciende sobre".
+- **Pendiente de confirmar:** frecuencia y algoritmo exactos de disparo de los invasores en el original (el arcade usa tablas de columnas preferidas por tipo de disparo). Esta spec fija "columna viva al azar, invasor más bajo, máximo 3 simultáneos". Valores fijados durante la implementación y documentados en `engine.ts`: cadencia 900ms en la oleada 1, −80ms por oleada, mínimo 260ms; velocidad 200 px/s, +26 px/s por oleada, máximo 420 px/s.
+- **Confirmado durante la implementación — UFO:** aparece cada 18s, cruza a 130 px/s por `y` = 52, alternando el lado de entrada en cada aparición.
 
 ## Risks
 

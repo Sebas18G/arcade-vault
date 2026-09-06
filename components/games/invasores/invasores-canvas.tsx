@@ -1,25 +1,43 @@
 "use client";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { AsteroidsEngine, ASTEROIDS_WIDTH, ASTEROIDS_HEIGHT } from "./engine";
+import {
+  InvasoresEngine,
+  INVASORES_WIDTH,
+  INVASORES_HEIGHT,
+  type InvasoresInput,
+} from "./engine";
 import type {
-  AsteroidsGameOverResult,
   GameCanvasHandle,
   GameCanvasProps,
+  InvasoresGameOverResult,
 } from "@/components/games/shared/types";
-const CONTROL_KEYS = [
-  "Space",
-  "ArrowUp",
-  "ArrowDown",
-  "ArrowLeft",
-  "ArrowRight",
-];
-export const AsteroidsCanvas = forwardRef<
+import { DEFAULT_GAME_SKIN } from "@/components/games/shared/skins";
+// Flechas y A/D en simultáneo, siguiendo el precedente de Snake (spec 08) y
+// Frogger (spec 09). El disparo va en Space.
+function inputFromKey(key: string): InvasoresInput | null {
+  switch (key) {
+    case "ArrowLeft":
+    case "a":
+    case "A":
+      return "LEFT";
+    case "ArrowRight":
+    case "d":
+    case "D":
+      return "RIGHT";
+    case " ":
+    case "Spacebar":
+      return "FIRE";
+    default:
+      return null;
+  }
+}
+export const InvasoresCanvas = forwardRef<
   GameCanvasHandle,
-  GameCanvasProps<AsteroidsGameOverResult>
->(function AsteroidsCanvas(
+  GameCanvasProps<InvasoresGameOverResult>
+>(function InvasoresCanvas(
   {
     paused,
-    skin = "classic",
+    skin = DEFAULT_GAME_SKIN,
     onScoreChange,
     onLivesChange,
     onLevelChange,
@@ -28,7 +46,7 @@ export const AsteroidsCanvas = forwardRef<
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<AsteroidsEngine | null>(null);
+  const engineRef = useRef<InvasoresEngine | null>(null);
   const callbacksRef = useRef({
     onScoreChange,
     onLivesChange,
@@ -47,7 +65,7 @@ export const AsteroidsCanvas = forwardRef<
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const engine = new AsteroidsEngine({
+    const engine = new InvasoresEngine({
       onScoreChange: (score) => callbacksRef.current.onScoreChange(score),
       onLivesChange: (lives) => callbacksRef.current.onLivesChange(lives),
       onLevelChange: (level) => callbacksRef.current.onLevelChange(level),
@@ -58,21 +76,23 @@ export const AsteroidsCanvas = forwardRef<
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement && document.activeElement.tagName === "INPUT")
         return;
-      if (CONTROL_KEYS.includes(e.code)) e.preventDefault();
-      engine.keyDown(e.code);
+      const input = inputFromKey(e.key);
+      if (!input) return;
+      e.preventDefault();
+      engine.keyDown(input);
     };
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (document.activeElement && document.activeElement.tagName === "INPUT")
-        return;
-      engine.keyUp(e.code);
+      const input = inputFromKey(e.key);
+      if (!input) return;
+      engine.keyUp(input);
     };
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
     let rafId = 0;
-    let lastTime: number | null = null;
-    const loop = (ts: number) => {
-      const dt = lastTime === null ? 0 : Math.min((ts - lastTime) / 1000, 0.05);
-      lastTime = ts;
+    let lastTime = performance.now();
+    const loop = (time: number) => {
+      const dt = time - lastTime;
+      lastTime = time;
       engine.update(dt);
       engine.draw(ctx);
       rafId = requestAnimationFrame(loop);
@@ -96,6 +116,6 @@ export const AsteroidsCanvas = forwardRef<
     restart: () => engineRef.current?.restart(),
   }));
   return (
-    <canvas ref={canvasRef} width={ASTEROIDS_WIDTH} height={ASTEROIDS_HEIGHT} />
+    <canvas ref={canvasRef} width={INVASORES_WIDTH} height={INVASORES_HEIGHT} />
   );
 });

@@ -2874,3 +2874,372 @@ a {
   color: var(--magenta);
   text-shadow: 0 0 6px rgba(255, 0, 110, 0.45);
 }
+/* ===== gamepad táctil (spec 16) ===== */
+/* Portado de references/gamepad-assets/gamepad.html, reescrito sobre las
+   variables de tema del proyecto. Oculto por defecto: solo aparece con puntero
+   grueso o viewport angosto (un teléfono en horizontal pasa de 768 px, así que
+   un breakpoint de ancho puro dejaría el juego sin controles al rotar). */
+.mobile-gamepad {
+  display: none;
+}
+
+@media (pointer: coarse), (max-width: 900px) {
+  .mobile-gamepad {
+    display: block;
+    margin-top: 18px;
+  }
+}
+
+.gp {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 12px 18px 10px;
+  background: linear-gradient(180deg, #1c1c28 0%, #0c0c14 100%);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow:
+    0 30px 80px -30px rgba(0, 245, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.6);
+}
+.gp::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(0, 245, 255, 0.14);
+  border-radius: 18px;
+  pointer-events: none;
+}
+
+/* Fila de sistema: los mismos comandos que el HUD de escritorio, que se
+   compacta y esconde sus botones en pantallas angostas. */
+.gp-top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 0 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.gp-sys {
+  font-family: var(--pixel);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+  background: #12121c;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 2px 0 #050507;
+  transition:
+    color 140ms,
+    border-color 140ms;
+}
+.gp-sys:hover {
+  color: var(--cyan);
+  border-color: rgba(0, 245, 255, 0.35);
+}
+.gp-sys:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+.gp-sys.magenta:hover {
+  color: var(--magenta);
+  border-color: rgba(255, 0, 110, 0.4);
+}
+.gp-sys.ghost {
+  color: var(--ink-faint);
+}
+
+.gp-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: center;
+  padding: 18px 6px 10px;
+  position: relative;
+  z-index: 1;
+  /* Sin esto, arrastrar el pulgar sobre la cruceta desplaza la página. */
+  touch-action: none;
+  overscroll-behavior: contain;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ----- D-pad ----- */
+.gp-dpad {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  justify-self: start;
+}
+.dp {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(180deg, #1a1a25, #0a0a12);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow:
+    0 4px 0 #050507,
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.6);
+  transition:
+    transform 80ms,
+    box-shadow 140ms,
+    color 140ms,
+    border-color 140ms,
+    background 140ms;
+}
+.dp .dp-arrow {
+  width: 22px;
+  height: 22px;
+  transition: filter 140ms;
+  pointer-events: none;
+}
+.dp.on {
+  transform: translateY(3px);
+  color: var(--cyan);
+  background: linear-gradient(180deg, #08161e, #030a0e);
+  border-color: var(--cyan);
+  box-shadow:
+    0 1px 0 #050507,
+    inset 0 0 16px rgba(0, 245, 255, 0.45),
+    0 0 16px rgba(0, 245, 255, 0.5);
+}
+.dp.on .dp-arrow {
+  filter: drop-shadow(0 0 6px var(--cyan)) drop-shadow(0 0 12px var(--cyan));
+}
+/* Botón sin binding (o partida en pausa): apagado, no oculto — la carcasa
+   mantiene la misma silueta en los 6 juegos. */
+.dp:disabled,
+.ab:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+.dp-up {
+  top: 0;
+  left: 51px;
+}
+.dp-down {
+  bottom: 0;
+  left: 51px;
+}
+.dp-left {
+  left: 0;
+  top: 51px;
+}
+.dp-right {
+  right: 0;
+  top: 51px;
+}
+.dp-hub {
+  position: absolute;
+  top: 51px;
+  left: 51px;
+  width: 48px;
+  height: 48px;
+  background: radial-gradient(circle at 50% 50%, #181822 0%, #08080d 80%);
+  border: 1px solid rgba(0, 245, 255, 0.15);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+.dp-hub-gem {
+  width: 12px;
+  height: 12px;
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  animation: gp-pulse 2s ease-in-out infinite;
+}
+@keyframes gp-pulse {
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+
+/* ----- Botones A / B ----- */
+.gp-actions {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 18px;
+  justify-items: center;
+  align-items: start;
+  justify-self: end;
+}
+.gp-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.ab {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  background:
+    radial-gradient(
+      circle at 32% 26%,
+      rgba(255, 255, 255, 0.25),
+      transparent 50%
+    ),
+    radial-gradient(circle at 50% 55%, var(--ab-mid), var(--ab-deep) 75%);
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 6px 0 #050507,
+    0 0 22px var(--ab-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.4);
+  transition:
+    transform 80ms,
+    box-shadow 140ms;
+}
+.ab.a {
+  color: var(--magenta);
+  --ab-mid: rgba(255, 0, 110, 0.7);
+  --ab-deep: rgba(110, 0, 40, 0.95);
+  --ab-glow: rgba(255, 0, 110, 0.4);
+}
+.ab.b {
+  color: var(--cyan);
+  --ab-mid: rgba(0, 200, 230, 0.7);
+  --ab-deep: rgba(0, 50, 70, 0.95);
+  --ab-glow: rgba(0, 245, 255, 0.4);
+}
+.ab .ab-letter {
+  font-family: var(--pixel);
+  font-size: 20px;
+  color: #fff;
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+.ab.a .ab-letter {
+  text-shadow:
+    0 0 8px var(--magenta),
+    0 0 18px var(--magenta);
+}
+.ab.b .ab-letter {
+  text-shadow:
+    0 0 8px var(--cyan),
+    0 0 18px var(--cyan);
+}
+.ab .ab-ring {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 1px dashed currentColor;
+  opacity: 0;
+  transition:
+    opacity 140ms,
+    transform 200ms;
+  pointer-events: none;
+}
+.ab.on {
+  transform: translateY(4px) scale(0.97);
+  box-shadow:
+    0 1px 0 #050507,
+    0 0 36px var(--ab-glow),
+    inset 0 0 18px rgba(0, 0, 0, 0.5);
+}
+.ab.on .ab-ring {
+  opacity: 1;
+  transform: scale(1.08);
+}
+.ab-caption {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.gp-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-faint);
+}
+
+/* Reproductor en pantallas angostas: el HUD se compacta (la puntuación y las
+   vidas son parte del juego, no se ocultan) y la fila de botones desaparece
+   porque el gamepad ya los ofrece. */
+@media (max-width: 700px) {
+  .player-hud {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .hud-stat .v,
+  .hud-stat button.v {
+    font-size: 12px;
+  }
+  .hud-stat .l {
+    font-size: 9px;
+  }
+  .hud-actions {
+    display: none;
+  }
+  .crt {
+    padding: 12px;
+    border-radius: 18px;
+  }
+  .crt-bottom {
+    font-size: 7px;
+    letter-spacing: 0.1em;
+  }
+  .gp-dpad {
+    width: 138px;
+    height: 138px;
+  }
+  .dp {
+    width: 44px;
+    height: 44px;
+  }
+  .dp-up,
+  .dp-down {
+    left: 47px;
+  }
+  .dp-left,
+  .dp-right {
+    top: 47px;
+  }
+  .dp-hub {
+    top: 47px;
+    left: 47px;
+    width: 44px;
+    height: 44px;
+  }
+  .ab {
+    width: 62px;
+    height: 62px;
+  }
+  .gp-actions {
+    gap: 14px;
+  }
+}

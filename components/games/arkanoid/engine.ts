@@ -1,27 +1,36 @@
 import type { GameOverResult } from "@/components/games/shared/types";
+import type { GameSkin } from "@/components/games/shared/skins";
+import {
+  ARKANOID_SKIN_PALETTES,
+  type ArkanoidBlockColor,
+  type ArkanoidIndestructibleTexture,
+  type ArkanoidPalette,
+  type ArkanoidPiecePalette,
+} from "./skins";
 export const ARKANOID_WIDTH = 800;
 export const ARKANOID_HEIGHT = 600;
-const BG_COLOR = "#1414a0";
 const SOUNDS = {
   bounce: "/games/arkanoid/sounds/ball-bounce.mp3",
   break: "/games/arkanoid/sounds/break-sound.mp3",
 };
-const BLOCK_COLORS = [
+// Los tipos de color y textura viven en ./skins para que la paleta pueda
+// tiparlos sin ciclo de imports (mismo patron que asteroids).
+type BlockColor = ArkanoidBlockColor;
+type IndestructibleTexture = ArkanoidIndestructibleTexture;
+const BLOCK_COLORS: readonly BlockColor[] = [
   "red",
   "yellow",
   "cyan",
   "magenta",
   "hotpink",
   "green",
-] as const;
-type BlockColor = (typeof BLOCK_COLORS)[number];
-const INDESTRUCTIBLE_TEXTURES = [
+];
+const INDESTRUCTIBLE_TEXTURES: readonly IndestructibleTexture[] = [
   "wood",
   "brick_red",
   "stone",
   "brick_dark",
-] as const;
-type IndestructibleTexture = (typeof INDESTRUCTIBLE_TEXTURES)[number];
+];
 const GRID_COLS = 10;
 const BLOCK_SCORE = 10;
 const MAX_LEVEL = 15;
@@ -178,6 +187,48 @@ function drawSprite(
   if (!sp) return;
   ctx.drawImage(ssImg, sp.sx, sp.sy, sp.sw, sp.sh, x, y, w, h);
 }
+/** Activa el halo de la pieza. Con `glow: 0` no toca el contexto. */
+function setGlow(ctx: CanvasRenderingContext2D, color: string, glow: number) {
+  if (glow <= 0) return;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = glow;
+}
+/** Resetea el halo para que no se filtre al resto del frame. */
+function clearGlow(ctx: CanvasRenderingContext2D) {
+  ctx.shadowBlur = 0;
+}
+/** Rectangulo relleno con contorno de 2 px (bloques y pala en modo `solid`). */
+function drawSolidRect(
+  ctx: CanvasRenderingContext2D,
+  piece: ArkanoidPiecePalette,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  setGlow(ctx, piece.fill, piece.glow);
+  ctx.fillStyle = piece.fill;
+  ctx.fillRect(x, y, w, h);
+  clearGlow(ctx);
+  ctx.strokeStyle = piece.edge;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, Math.max(0, w - 2), Math.max(0, h - 2));
+}
+/** Bola en modo `solid`: circulo relleno con halo opcional. */
+function drawSolidBall(
+  ctx: CanvasRenderingContext2D,
+  piece: ArkanoidPiecePalette,
+  cx: number,
+  cy: number,
+  r: number,
+) {
+  setGlow(ctx, piece.fill, piece.glow);
+  ctx.fillStyle = piece.fill;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  clearGlow(ctx);
+}
 function playSound(name: keyof typeof SOUNDS) {
   const audio = new Audio(SOUNDS[name]);
   audio.play().catch(() => {});
@@ -204,6 +255,8 @@ export class ArkanoidEngine {
   private pendingLevelComplete = false;
   private keysLeft = false;
   private keysRight = false;
+  private skin: GameSkin = "classic";
+  private palette: ArkanoidPalette = ARKANOID_SKIN_PALETTES.classic;
   constructor(callbacks: ArkanoidEngineCallbacks) {
     this.callbacks = callbacks;
     loadSpritesheet().then(() => {
@@ -224,6 +277,14 @@ export class ArkanoidEngine {
     this.callbacks.onScoreChange(this.score);
     this.callbacks.onLivesChange(this.lives);
     this.callbacks.onLevelChange(this.level);
+  }
+  setSkin(skin: GameSkin) {
+    this.skin = skin;
+    this.palette =
+      ARKANOID_SKIN_PALETTES[skin] ?? ARKANOID_SKIN_PALETTES.classic;
+  }
+  getSkin(): GameSkin {
+    return this.skin;
   }
   setPaused(paused: boolean) {
     this.paused = paused;
@@ -408,34 +469,56 @@ export class ArkanoidEngine {
   private drawExplosions(ctx: CanvasRenderingContext2D) {
     for (const ex of this.explosions) {
       const elapsed = performance.now() - ex.startTime;
-      const frameIndex = Math.min(
-        3,
-        Math.floor(elapsed / (EXPLOSION_DURATION / 4)),
-      );
-      const frame = EXPLOSION_FRAMES[ex.color][frameIndex];
-      drawFrame(ctx, frame, ex.x, ex.y, ex.w, ex.h);
+      if (this.palette.render === "sprite") {
+        const frameIndex = Math.min(
+          3,
+          Math.floor(elapsed / (EXPLOSION_DURATION / 4)),
+        );
+        const frame = EXPLOSION_FRAMES[ex.color][frameIndex];
+        drawFrame(ctx, frame, ex.x, ex.y, ex.w, ex.h);
+      } else {
+        this.drawExplosionSolid(ctx, ex, elapsed);
+      }
     }
+  }
+  /** Destello procedural: el bloque se expande y se desvanece en su color. */
+  private drawExplosionSolid(
+    ctx: CanvasRenderingContext2D,
+    ex: Explosion,
+    elapsed: number,
+  ) {
+    const progress = Math.min(1, elapsed / EXPLOSION_DURATION);
+    const grow = 6 * progress;
+    const color = this.palette.blocks[ex.color].fill;
+    ctx.save();
+    ctx.globalAlpha = 1 - progress;
+    setGlow(ctx, color, this.palette.explosionGlow);
+    ctx.fillStyle = color;
+    ctx.fillRect(ex.x - grow, ex.y - grow, ex.w + grow * 2, ex.h + grow * 2);
+    ctx.restore();
+    clearGlow(ctx);
   }
   private drawHUD(ctx: CanvasRenderingContext2D) {
     ctx.font = 'bold 22px "Courier New", monospace';
     ctx.textBaseline = "top";
-    ctx.shadowColor = "rgba(255, 255, 255, 0.5)";
-    ctx.shadowBlur = 6;
-    ctx.fillStyle = "#fff";
+    const hud = this.palette.hud;
+    ctx.shadowColor = hud.shadow;
+    ctx.shadowBlur = hud.shadowBlur;
+    ctx.fillStyle = hud.score;
     ctx.textAlign = "left";
     ctx.fillText(`PUNTAJE ${this.score}`, 10, 10);
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = hud.level;
     ctx.textAlign = "center";
     ctx.fillText(`NIVEL ${this.level} / ${MAX_LEVEL}`, ARKANOID_WIDTH / 2, 10);
-    ctx.fillStyle = "#ff3b3b";
+    ctx.fillStyle = hud.lives;
     ctx.textAlign = "right";
     ctx.fillText(`VIDAS ${this.lives}`, ARKANOID_WIDTH - 10, 10);
     ctx.shadowBlur = 0;
   }
   private drawLevelCompleteScreen(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    ctx.fillStyle = this.palette.overlay.fill;
     ctx.fillRect(0, 0, ARKANOID_WIDTH, ARKANOID_HEIGHT);
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = this.palette.overlay.text;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = "48px sans-serif";
@@ -451,26 +534,47 @@ export class ArkanoidEngine {
       ARKANOID_HEIGHT / 2 + 20,
     );
   }
-  draw(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = BG_COLOR;
-    ctx.fillRect(0, 0, ARKANOID_WIDTH, ARKANOID_HEIGHT);
-    if (!this.ready) return;
-    drawSprite(
-      ctx,
-      "paddle",
-      this.paddle.x,
-      this.paddle.y,
-      this.paddle.w,
-      this.paddle.h,
-    );
+  /** Dispatcher de pala: sprite del spritesheet o rectangulo procedural. */
+  private drawPaddle(ctx: CanvasRenderingContext2D) {
+    const { x, y, w, h } = this.paddle;
+    if (this.palette.render === "sprite") {
+      drawSprite(ctx, "paddle", x, y, w, h);
+      return;
+    }
+    drawSolidRect(ctx, this.palette.paddle, x, y, w, h);
+  }
+  /** Dispatcher de bola: sprite del spritesheet o circulo procedural. */
+  private drawBall(ctx: CanvasRenderingContext2D) {
     const b = this.ball;
-    drawSprite(ctx, "ball", b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
-    for (const block of this.blocks) {
-      if (!block.alive) continue;
+    if (this.palette.render === "sprite") {
+      drawSprite(ctx, "ball", b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+      return;
+    }
+    drawSolidBall(ctx, this.palette.ball, b.x, b.y, b.r);
+  }
+  /** Dispatcher de bloque: sprite del spritesheet o rectangulo procedural. */
+  private drawBlock(ctx: CanvasRenderingContext2D, block: Block) {
+    if (this.palette.render === "sprite") {
       const spriteName = block.breakable
         ? `block_${block.color}`
         : `indestructible_${block.texture}`;
       drawSprite(ctx, spriteName, block.x, block.y, block.w, block.h);
+      return;
+    }
+    const piece = block.breakable
+      ? this.palette.blocks[block.color!]
+      : this.palette.indestructible[block.texture!];
+    drawSolidRect(ctx, piece, block.x, block.y, block.w, block.h);
+  }
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.fillStyle = this.palette.background;
+    ctx.fillRect(0, 0, ARKANOID_WIDTH, ARKANOID_HEIGHT);
+    if (!this.ready) return;
+    this.drawPaddle(ctx);
+    this.drawBall(ctx);
+    for (const block of this.blocks) {
+      if (!block.alive) continue;
+      this.drawBlock(ctx, block);
     }
     this.drawExplosions(ctx);
     this.drawHUD(ctx);

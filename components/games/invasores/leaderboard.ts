@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type {
-  GameOverResult,
+  InvasoresGameOverResult,
   LeaderboardEntry,
 } from "@/components/games/shared/types";
 import {
@@ -9,13 +9,13 @@ import {
   type GameSkin,
 } from "@/components/games/shared/skins";
 import { requireUserId } from "@/components/games/shared/session";
-// Preferencia de UI: vive solo en localStorage, nunca en Supabase.
-const SKIN_KEY = "arkanoid-skin";
 const MAX_ENTRIES = 5;
-export async function getArkanoidLeaderboard(): Promise<LeaderboardEntry[]> {
+// Preferencia de UI: vive solo en localStorage, nunca en Supabase.
+const SKIN_KEY = "invasores-skin";
+export async function getInvasoresLeaderboard(): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("arkanoid_scores")
+    .from("invasores_scores")
     .select("id, player_name, score, level")
     .order("score", { ascending: false })
     .limit(MAX_ENTRIES);
@@ -27,22 +27,27 @@ export async function getArkanoidLeaderboard(): Promise<LeaderboardEntry[]> {
     level: row.level,
   }));
 }
-export async function addArkanoidScore(
+export async function addInvasoresScore(
   name: string,
-  result: GameOverResult,
+  result: InvasoresGameOverResult,
 ): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
   const userId = await requireUserId(supabase);
-  const { error } = await supabase.from("arkanoid_scores").insert({
+  // player_name lo pisa el trigger invasores_enforce_player_name con el alias
+  // del perfil de quien inserta (spec 13).
+  const { error } = await supabase.from("invasores_scores").insert({
     player_name: name,
     score: result.score,
     level: result.level,
+    aliens_killed: result.aliensKilled,
+    ufos_hit: result.ufosHit,
+    shots_fired: result.shotsFired,
     user_id: userId,
   });
   if (error) throw error;
-  return getArkanoidLeaderboard();
+  return getInvasoresLeaderboard();
 }
-export function getArkanoidSkin(): GameSkin {
+export function getInvasoresSkin(): GameSkin {
   try {
     const stored = localStorage.getItem(SKIN_KEY);
     return isGameSkin(stored) ? stored : DEFAULT_GAME_SKIN;
@@ -50,7 +55,7 @@ export function getArkanoidSkin(): GameSkin {
     return DEFAULT_GAME_SKIN;
   }
 }
-export function setArkanoidSkin(skin: GameSkin): void {
+export function setInvasoresSkin(skin: GameSkin): void {
   try {
     localStorage.setItem(SKIN_KEY, skin);
   } catch {
