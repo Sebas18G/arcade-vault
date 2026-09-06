@@ -27,7 +27,7 @@ Es legible y editable a mano: si quieres vetar un juego o cambiar un estado, edi
 | SNAKE       | `snake`       | Implementado      | —      | 2026-08-30 |
 | ASTEROIDS   | `asteroids`   | Implementado      | —      | 2026-08-30 |
 | FROGGER     | `frogger`     | Implementado      | 9/10   | 2026-09-04 |
-| INVASORES   | `invasores`   | Sugerido          | 9/10   | 2026-08-30 |
+| INVASORES   | `invasores`   | Aceptado          | 9/10   | 2026-09-05 |
 | 2048        | `2048`        | Candidato natural | 9/10   | 2026-08-30 |
 | CIEMPIÉS    | `ciempies`    | Candidato natural | 8/10   | 2026-08-30 |
 | MISILES     | `misiles`     | Candidato natural | 8/10   | 2026-08-30 |
@@ -90,8 +90,9 @@ Es legible y editable a mano: si quieres vetar un juego o cambiar un estado, edi
 
 ### INVASORES (`invasores`)
 
-**Estado:** Sugerido · **Encaje:** 9/10 · **Fecha:** 2026-08-30 · **Tipo:** upgrade de simulado
+**Estado:** Aceptado · **Encaje:** 9/10 · **Fecha:** 2026-09-05 · **Tipo:** upgrade de simulado
 **Situación:** entrada de catálogo con reproductor simulado. Sin motor real ni tabla propia.
+**Aceptado el 2026-09-05:** con sus dos specs escritas en `specs/games-jam/` — `14-invasores-motor.md` (motor de canvas 800×600, formación 5×11, búnkeres destructibles, UFO y oleadas infinitas) y `15-invasores-leaderboard.md` (tabla `invasores_scores` con el modelo autenticado de las specs 12/13, más el reflejo obligatorio en `supabase/prod/`). Ambas nacen en `Draft`: las aprueba el humano. Partición en dos specs elegida explícitamente por el usuario, dejando la capa de stats visibles (precisión de tiro) y las skins para una spec futura. **Sin renombrado de id**: `invasores` ya coincide con `components/games/invasores/`.
 **Por qué encaja:** es el candidato con menos fricción contra `recipe.md`. Movimiento en grilla por pasos discretos (cero física real, cero WebGL), dibujable con `ctx.fillRect` sin un solo asset binario, controles de dos teclas más disparo, y una puntuación monótona y bien documentada que hace un leaderboard `score DESC` significativo desde la primera partida. Es upgrade de un simulado: reusa entrada de catálogo, `cover-invaders`, color y copy en Español ya escritos. Además aporta la mejor stat propia del catálogo hasta ahora (precisión de tiro), que ningún otro juego tiene.
 **Brief:** cat SHOOTER (existe) · color green · cover `cover-invaders` · canvas 800×600 · teclado (`←`/`→` o `A`/`D` + `Space`) · 3 vidas · niveles sí (oleadas) · leaderboard: score, level, `aliens_killed`, `ufos_hit`, `shots_fired`
 **Mecánica confirmada:** 5 filas × 11 columnas = 55 invasores. Fila superior 30 pts, dos filas medias 20 pts, dos filas inferiores 10 pts → 990 pts por pantalla limpia. El UFO **no** vale un valor aleatorio: recorre la secuencia fija `(50,50,100,150,100,100,50,300,100,100,100,50,150,100,100)` indexada por el número de disparos del jugador. La formación acelera a medida que quedan menos invasores. Al limpiar la pantalla, la oleada siguiente empieza más abajo, en bucle infinito. 4 búnkeres destructibles por pantalla, erosionados por disparos de ambos bandos y arrasados si un invasor los atraviesa.
