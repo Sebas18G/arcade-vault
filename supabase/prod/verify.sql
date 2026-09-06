@@ -25,13 +25,15 @@ with chequeos as (
     (select count(*) from pg_policies where schemaname = 'arcade-vault')::int
 
   union all
-  select 4, 'Funciones', 3,
+  select 4, 'Funciones', 4,
     (select count(*) from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'arcade-vault' and p.prokind = 'f')::int
 
+  -- Los 13 del schema. El de la spec 17 no está aquí porque cuelga de
+  -- auth.users, que es de otro schema: lo cuenta el chequeo 11.
   union all
-  select 5, 'Triggers (6 enforce + 6 mirror + 1 freeze)', 13,
+  select 5, 'Triggers en arcade-vault (6 enforce + 6 mirror + 1 freeze)', 13,
     (select count(*) from pg_trigger t
      join pg_class c on c.oid = t.tgrelid
      join pg_namespace n on n.oid = c.relnamespace
@@ -50,7 +52,7 @@ with chequeos as (
   -- SECURITY DEFINER sin search_path resuelve nombres según el del invocador,
   -- que el cliente controla.
   union all
-  select 8, 'Funciones con search_path fijado', 3,
+  select 8, 'Funciones con search_path fijado', 4,
     (select count(*) from pg_proc p
      join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'arcade-vault' and p.prokind = 'f'
@@ -71,6 +73,15 @@ with chequeos as (
   select 10, 'Puntajes precargados (debe arrancar vacío)', 0,
     (select count(*) from "arcade-vault".global_scores)::int
 
+  -- Spec 17: sin este trigger el registro por correo crea el usuario pero no su
+  -- perfil, y el jugador queda autenticado sin alias.
+  union all
+  select 11, 'Trigger on_auth_user_created en auth.users', 1,
+    (select count(*) from pg_trigger
+     where tgrelid = 'auth.users'::regclass
+       and tgname = 'on_auth_user_created'
+       and not tgisinternal)::int
+
 )
 select
   orden,
@@ -89,13 +100,18 @@ order by orden;
 --   select * from "arcade-vault".games order by id;
 --   -> arkanoid / asteroids / frogger / invasores / snake / tetris
 
--- Los 13 triggers, tabla por tabla:
+-- Los 13 triggers del schema, tabla por tabla (el 14º vive en auth.users):
 --   select c.relname, t.tgname
 --   from pg_trigger t
 --   join pg_class c on c.oid = t.tgrelid
 --   join pg_namespace n on n.oid = c.relnamespace
 --   where n.nspname = 'arcade-vault' and not t.tgisinternal
 --   order by 1, 2;
+
+-- El ACL de las 4 funciones, que debe ser {postgres=X/postgres} en todas:
+--   select proname, proacl::text from pg_proc p
+--   join pg_namespace n on n.oid = p.pronamespace
+--   where n.nspname = 'arcade-vault' and p.prokind = 'f' order by 1;
 
 -- Las 17 policies con su condición:
 --   select tablename, policyname, cmd, roles, qual, with_check

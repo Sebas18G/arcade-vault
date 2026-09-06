@@ -15,6 +15,10 @@ function AliasCard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get("next"));
+  const aliasLength = alias.trim().length;
+  const aliasValid = aliasLength >= ALIAS_MIN && aliasLength <= ALIAS_MAX;
+  // Un campo vacío que todavía nadie tocó no está "mal", solo está vacío.
+  const aliasState = aliasLength === 0 ? "" : aliasValid ? "valid" : "invalid";
   useEffect(() => {
     let cancelled = false;
     const supabase = createClient();
@@ -126,40 +130,36 @@ function AliasCard() {
                 }
                 placeholder="PX_KAI"
                 maxLength={ALIAS_MAX}
+                className={aliasState && `is-${aliasState}`}
+                aria-invalid={aliasState === "invalid"}
                 autoFocus
               />
-              <div
-                className="mono"
-                style={{
-                  fontSize: 10,
-                  color: "var(--ink-faint)",
-                  letterSpacing: "0.1em",
-                  marginTop: 6,
-                }}
-              >
-                {ALIAS_MIN}–{ALIAS_MAX} CARACTERES · NO SE PUEDE CAMBIAR DESPUÉS
+              <div className="field-hint">
+                <span>
+                  {ALIAS_MIN}–{ALIAS_MAX} CARACTERES · NO SE PUEDE CAMBIAR
+                  DESPUÉS
+                </span>
+                <span
+                  className={`field-count ${aliasState && `is-${aliasState}`}`}
+                >
+                  {aliasLength}/{ALIAS_MAX}
+                </span>
               </div>
             </div>
             {error && (
-              <div
-                className="mono"
-                style={{
-                  marginTop: 12,
-                  fontSize: 11,
-                  color: "var(--magenta)",
-                  letterSpacing: "0.08em",
-                }}
-              >
-                ▸ {error}
+              <div className="auth-error" role="alert">
+                {error}
               </div>
             )}
             <button
               className="btn lg"
               type="submit"
               disabled={busy}
+              aria-busy={busy}
               style={{ width: "100%", marginTop: 8 }}
             >
-              {busy ? "GUARDANDO..." : "RESERVAR ALIAS"}
+              {busy && <span className="spinner" />}
+              RESERVAR ALIAS
             </button>
           </form>
         )}

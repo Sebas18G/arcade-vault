@@ -3,8 +3,8 @@
 -- =============================================================================
 --
 -- Reproduce en una instancia limpia todo el esquema que en desarrollo se fue
--- construyendo con 16 migraciones incrementales (specs 04, 06, 08, 12, 13, 15 y las
--- de games-jam). Es la consolidación de ese historial en un solo archivo.
+-- construyendo con 17 migraciones incrementales (specs 04, 06, 08, 12, 13, 15, 17
+-- y las de games-jam). Es la consolidación de ese historial en un solo archivo.
 --
 -- CÓMO USARLO
 --   1. ANTES de correr esto: en el dashboard de producción, Settings -> API ->
@@ -258,7 +258,7 @@ create policy global_scores_select_public on "arcade-vault".global_scores
 -- -----------------------------------------------------------------------------
 -- 5. Funciones
 --
--- Las tres nacen con `set search_path = ''` y sin EXECUTE para anon/authenticated:
+-- Las cuatro nacen con `set search_path = ''` y sin EXECUTE para anon/authenticated:
 -- son funciones de trigger, nadie debería poder llamarlas como RPC (spec 13).
 -- -----------------------------------------------------------------------------
 
@@ -312,6 +312,36 @@ begin
 end;
 $function$;
 
+-- Crea el perfil en el mismo momento en que nace el usuario, así no existe una
+-- ventana en la que auth.users tenga una fila sin alias por un segundo paso del
+-- cliente que no llegó a ejecutarse (spec 17).
+--
+-- Solo actúa si el alta trae username en los metadatos: es el caso del registro
+-- por correo, donde el jugador ya lo escribió. En OAuth no viene, la función no
+-- hace nada, y /auth/callback sigue mandando a /auth/alias como hasta ahora.
+--
+-- Si el alias está tomado o no cumple 3-10 caracteres, el insert falla, el alta
+-- entera se revierte y no queda un usuario huérfano en auth.users.
+create or replace function "arcade-vault".handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  alias text := upper(trim(new.raw_user_meta_data->>'username'));
+begin
+  if alias is null or alias = '' then
+    return new;
+  end if;
+
+  insert into "arcade-vault".profiles (id, username)
+  values (new.id, alias);
+
+  return new;
+end;
+$function$;
+
 -- Hay que revocar de PUBLIC, no solo de anon/authenticated: Postgres concede
 -- EXECUTE a PUBLIC en toda función nueva, y esos dos roles lo heredan de ahí.
 -- Revocarles a ellos directamente no quita nada y las deja invocables como RPC
@@ -319,6 +349,7 @@ $function$;
 revoke execute on function "arcade-vault".enforce_player_name()     from public, anon, authenticated;
 revoke execute on function "arcade-vault".freeze_username()         from public, anon, authenticated;
 revoke execute on function "arcade-vault".mirror_to_global_scores() from public, anon, authenticated;
+revoke execute on function "arcade-vault".handle_new_user()         from public, anon, authenticated;
 
 -- -----------------------------------------------------------------------------
 -- 6. Triggers
@@ -391,6 +422,14 @@ drop trigger if exists profiles_freeze_username on "arcade-vault".profiles;
 create trigger profiles_freeze_username
   before update on "arcade-vault".profiles
   for each row execute function "arcade-vault".freeze_username();
+
+-- El único trigger que no cuelga de una tabla de "arcade-vault": vive en
+-- auth.users porque el perfil tiene que nacer dentro de la misma transacción
+-- que el usuario (spec 17).
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function "arcade-vault".handle_new_user();
 
 -- -----------------------------------------------------------------------------
 -- 7. Grants de tabla
