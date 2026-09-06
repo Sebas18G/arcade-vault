@@ -3,8 +3,15 @@ import type {
   InvasoresGameOverResult,
   LeaderboardEntry,
 } from "@/components/games/shared/types";
+import {
+  isGameSkin,
+  DEFAULT_GAME_SKIN,
+  type GameSkin,
+} from "@/components/games/shared/skins";
 import { requireUserId } from "@/components/games/shared/session";
 const MAX_ENTRIES = 5;
+// Preferencia de UI: vive solo en localStorage, nunca en Supabase.
+const SKIN_KEY = "invasores-skin";
 export async function getInvasoresLeaderboard(): Promise<LeaderboardEntry[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -39,4 +46,19 @@ export async function addInvasoresScore(
   });
   if (error) throw error;
   return getInvasoresLeaderboard();
+}
+export function getInvasoresSkin(): GameSkin {
+  try {
+    const stored = localStorage.getItem(SKIN_KEY);
+    return isGameSkin(stored) ? stored : DEFAULT_GAME_SKIN;
+  } catch {
+    return DEFAULT_GAME_SKIN;
+  }
+}
+export function setInvasoresSkin(skin: GameSkin): void {
+  try {
+    localStorage.setItem(SKIN_KEY, skin);
+  } catch {
+    // localStorage no disponible
+  }
 }

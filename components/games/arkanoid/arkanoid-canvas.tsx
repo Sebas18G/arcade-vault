@@ -5,9 +5,17 @@ import type {
   GameCanvasHandle,
   GameCanvasProps,
 } from "@/components/games/shared/types";
+import { DEFAULT_GAME_SKIN } from "@/components/games/shared/skins";
 export const ArkanoidCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
   function ArkanoidCanvas(
-    { paused, onScoreChange, onLivesChange, onLevelChange, onGameOver },
+    {
+      paused,
+      skin = DEFAULT_GAME_SKIN,
+      onScoreChange,
+      onLivesChange,
+      onLevelChange,
+      onGameOver,
+    },
     ref,
   ) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,6 +45,7 @@ export const ArkanoidCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         onGameOver: (result) => callbacksRef.current.onGameOver(result),
       });
       engineRef.current = engine;
+      engine.setSkin(skin);
       const handleKeyDown = (e: KeyboardEvent) => {
         if (
           document.activeElement &&
@@ -81,10 +90,14 @@ export const ArkanoidCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(
         canvas.removeEventListener("mousemove", handleMouseMove);
         engineRef.current = null;
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     useEffect(() => {
       engineRef.current?.setPaused(paused);
     }, [paused]);
+    useEffect(() => {
+      engineRef.current?.setSkin(skin);
+    }, [skin]);
     useImperativeHandle(ref, () => ({
       restart: () => engineRef.current?.restart(),
     }));
