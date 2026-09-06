@@ -18,6 +18,14 @@ export type FroggerGameOverResult = GameOverResult & {
   /** Puntos acumulados por tiempo sin usar del temporizador. */
   timeBonus: number;
 };
+export type InvasoresGameOverResult = GameOverResult & {
+  /** Invasores destruidos en toda la partida (no incluye UFOs). */
+  aliensKilled: number;
+  /** UFOs de bonus derribados. */
+  ufosHit: number;
+  /** Disparos efectuados por el jugador. Indexa además la tabla del UFO. */
+  shotsFired: number;
+};
 export type LeaderboardEntry = {
   id: string;
   name: string;
