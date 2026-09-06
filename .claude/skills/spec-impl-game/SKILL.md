@@ -1,11 +1,11 @@
 ---
 name: spec-impl-game
-description: Implementa una spec de juego siguiendo exactamente el mismo flujo que /spec-impl y, al terminar la implementación, encadena en secuencia los agentes skin-designer y game-jam.
+description: Implementa una spec de juego siguiendo exactamente el mismo flujo que /spec-impl y, al terminar la implementación, encadena en secuencia los agentes skin-designer y game-jam-writer.
 disable-model-invocation: true
 argument-hint: <NN-slug | games-jam/NN-slug> <juego-siguiente>
 ---
 
-# /spec-impl-game — Implementa una spec de juego y encadena skin-designer → game-jam
+# /spec-impl-game — Implementa una spec de juego y encadena skin-designer → game-jam-writer
 
 ## Session context
 
@@ -37,7 +37,7 @@ Juegos con motor real ya en el repo:
 `/spec-impl-game` es la variante de `/spec-impl` para las specs de **juegos**. Hace exactamente lo mismo que `/spec-impl` — no reimplementa sus fases, **las lee y las ejecuta** — y cuando la implementación termina, encadena dos agentes **en secuencia, nunca en paralelo**:
 
 1. **`skin-designer`** — le da al juego recién implementado sus 3 skins obligatorias.
-2. **`game-jam`** — escribe las specs del **siguiente** juego que se quiere implementar.
+2. **`game-jam-writer`** — escribe las specs del **siguiente** juego que se quiere implementar.
 
 Escribes y respondes **en Español**, igual que el resto del proyecto.
 
@@ -45,10 +45,10 @@ Escribes y respondes **en Español**, igual que el resto del proyecto.
 
 `$ARGUMENTS` trae dos valores separados por espacio:
 
-| Posición | Valor                               | Ejemplo                      |
-| -------- | ----------------------------------- | ---------------------------- |
-| 1º       | La spec a implementar               | `games-jam/09-frogger-motor` |
-| 2º       | El juego siguiente, para `game-jam` | `invasores`                  |
+| Posición | Valor                                      | Ejemplo                      |
+| -------- | ------------------------------------------ | ---------------------------- |
+| 1º       | La spec a implementar                      | `games-jam/09-frogger-motor` |
+| 2º       | El juego siguiente, para `game-jam-writer` | `invasores`                  |
 
 El 1º es obligatorio. El 2º puede faltar: en ese caso se pregunta en la Fase 6, no se inventa.
 
@@ -97,7 +97,7 @@ Solo cuando el **último paso** del plan de implementación quedó completo y co
 
 ## Fase 6 — Encadenar los dos agentes, en este orden
 
-> **Regla dura: los dos agentes van en llamadas separadas y consecutivas. Nunca en el mismo bloque de tool calls, nunca en paralelo.** El segundo no arranca hasta que el primero devolvió su informe. Si los lanzas juntos, `game-jam` puede escribir sobre un árbol que `skin-designer` todavía está tocando.
+> **Regla dura: los dos agentes van en llamadas separadas y consecutivas. Nunca en el mismo bloque de tool calls, nunca en paralelo.** El segundo no arranca hasta que el primero devolvió su informe. Si los lanzas juntos, `game-jam-writer` puede escribir sobre un árbol que `skin-designer` todavía está tocando.
 
 ### 6.1 — Primero: `skin-designer`
 
@@ -111,11 +111,11 @@ Cuando vuelva, **relaya al usuario** lo que importa de su informe:
 - resultado **literal** de `npm run lint` y `npm run build`,
 - el checklist manual para `/games/<id>/play`.
 
-**Si `skin-designer` reporta fallo de lint/build, o dice que no puede trabajar ese juego: para y pregunta antes de seguir.** No encadenes `game-jam` sobre un árbol roto.
+**Si `skin-designer` reporta fallo de lint/build, o dice que no puede trabajar ese juego: para y pregunta antes de seguir.** No encadenes `game-jam-writer` sobre un árbol roto.
 
-### 6.2 — Después: `game-jam`
+### 6.2 — Después: `game-jam-writer`
 
-Solo cuando 6.1 terminó bien. Lánzalo con `subagent_type: game-jam`.
+Solo cuando 6.1 terminó bien. Lánzalo con `subagent_type: game-jam-writer`.
 
 - **Entrada:** el 2º argumento del comando — el juego que se quiere implementar a continuación. **Si vino vacío, pregúntalo con `AskUserQuestion`** antes de lanzar; el agente no acepta entrada vacía y no debe inventarla.
 - **En el prompt del Agent, indícale explícitamente dos cosas:**
@@ -138,7 +138,7 @@ Cierra con una tabla:
 | Rama activa       | `spec-NN-slug`                          |
 | Bitácora          | `<JUEGO>` → `Implementado` (AAAA-MM-DD) |
 | `skin-designer`   | veredicto + lint/build                  |
-| `game-jam`        | specs nuevas creadas                    |
+| `game-jam-writer` | specs nuevas creadas                    |
 
 Y el siguiente comando a ejecutar, con **ruta relativa completa** (`/spec-impl` lista `specs/` de forma no recursiva, un número pelado puede no resolver a un archivo dentro de `specs/games-jam/`):
 
@@ -151,7 +151,7 @@ Siguiente paso: /spec-impl-game games-jam/NN-slug <siguiente-juego>
 ## Reglas duras
 
 - **Nunca commitees automáticamente.** Ni por paso, ni al final. El commit es decisión y comando del humano.
-- **Nunca lances los dos agentes en paralelo.** Primero `skin-designer`, y solo cuando terminó, `game-jam`.
+- **Nunca lances los dos agentes en paralelo.** Primero `skin-designer`, y solo cuando terminó, `game-jam-writer`.
 - **Nunca lances ningún agente si la spec no estaba `Approved`.** El bloqueo de la Fase 2 termina la corrida.
 - **Nunca marques una spec como `Approved`.** Eso lo hace el humano, a mano.
 - **Nunca inventes la fecha.** Sale de `date +%F`, en el session context.
