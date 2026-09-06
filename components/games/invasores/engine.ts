@@ -64,6 +64,15 @@ export const ALIEN_FIRE_MS_STEP = 80; // ms menos por oleada
 export const ALIEN_FIRE_MS_MIN = 260;
 export const BUNKER_Y = 460; // si la formación llega aquí, game over inmediato
 export const GROUND_Y = 570;
+/**
+ * Duración de la explosión del cañón. Durante ese lapso la partida entera se
+ * congela (formación, disparos y UFO) y el cañón se dibuja destruido, como en
+ * el arcade original. Recién al terminar reaparece centrado — o, si era la
+ * última vida, se emite el game over.
+ */
+export const DEATH_MS = 1100;
+/** ms que dura cada fotograma de los restos del cañón. */
+export const DEATH_FRAME_MS = 90;
 export const START_LIVES = 3;
 export const MAX_ALIEN_BULLETS = 3;
 /** Puntos por fila, de arriba (0) hacia abajo (4). */
@@ -128,6 +137,7 @@ const COLORS = {
   /** Un color por fila, alineado con ROW_POINTS: 30 / 20 / 20 / 10 / 10. */
   rows: ["#7df9ff", "#39ff14", "#39ff14", "#ffd166", "#ffd166"] as const,
   ufo: "#ff2e88",
+  explosion: "#ff9f1c",
   playerBullet: "#eaffea",
   alienBullet: "#ff6b6b",
 };
@@ -183,6 +193,27 @@ const SPRITE_CANNON = [
   "XXXXXXXXXXXXX",
   "XXXXXXXXXXXXX",
   "XXXXXXXXXXXXX",
+];
+/** Restos del cañón destruido: dos fotogramas que alternan. */
+const SPRITE_WRECK_A = [
+  "..X...X...X..",
+  "X..X.X.X.X..X",
+  ".X.XXXXXXX.X.",
+  "X.XXXXXXXXX.X",
+  "XXXXXXXXXXXXX",
+  ".XXXXXXXXXXX.",
+  "X.XX.XXX.XX.X",
+  "..X..X.X..X..",
+];
+const SPRITE_WRECK_B = [
+  "X...X...X...X",
+  "..X..X.X..X..",
+  "X.XX.XXX.XX.X",
+  ".XXXXXXXXXXX.",
+  "XXXXXXXXXXXXX",
+  "X.XXXXXXXXX.X",
+  "..XX.X.X.XX..",
+  ".X..X...X..X.",
 ];
 /** Un sprite por fila de la formación, alineado con ROW_POINTS. */
 const ROW_SPRITES = [
@@ -265,6 +296,8 @@ export class InvasoresEngine {
     RIGHT: false,
     FIRE: false,
   };
+  /** ms que le quedan a la explosión del cañón; 0 = no está muriendo. */
+  private deathMs = 0;
   /** null = no hay disparo del jugador en vuelo, así que se puede disparar. */
   private playerBullet: Bullet | null = null;
   /** Disparos alienígenas en vuelo; nunca más de MAX_ALIEN_BULLETS. */
@@ -302,6 +335,7 @@ export class InvasoresEngine {
     this.pendingDrop = false;
     this.accMs = 0;
     this.keys = { LEFT: false, RIGHT: false, FIRE: false };
+    this.deathMs = 0;
     this.playerBullet = null;
     this.alienBullets = [];
     this.alienFireMs = this.alienFireIntervalMs();
@@ -368,6 +402,18 @@ export class InvasoresEngine {
     }
   }
   private tick() {
+    // Mientras el cañón se desintegra, todo lo demás queda congelado.
+    if (this.deathMs > 0) {
+      this.deathMs -= TICK_MS;
+      if (this.deathMs > 0) return;
+      this.deathMs = 0;
+      if (this.lives <= 0) {
+        this.gameOver();
+        return;
+      }
+      this.cannonX = (INVASORES_WIDTH - CANNON_W) / 2;
+      return;
+    }
     this.stepFormation();
     this.updateCannon();
     this.updatePlayerBullet();
@@ -599,14 +645,17 @@ export class InvasoresEngine {
       }
     }
   }
-  /** Un impacto en el cañón: limpia la pantalla de disparos y recentra. */
+  /**
+   * Un impacto en el cañón: descuenta la vida (el HUD se entera en el acto),
+   * limpia la pantalla de disparos y arranca la explosión. El recentrado y el
+   * game over ocurren al terminar la animación, no acá.
+   */
   private loseLife() {
     this.lives--;
     this.callbacks.onLivesChange(this.lives);
     this.alienBullets = [];
     this.playerBullet = null;
-    this.cannonX = (INVASORES_WIDTH - CANNON_W) / 2;
-    if (this.lives <= 0) this.gameOver();
+    this.deathMs = DEATH_MS;
   }
   private gameOver() {
     this.screen = "gameover";
@@ -780,6 +829,22 @@ export class InvasoresEngine {
     }
   }
   private drawCannon(ctx: CanvasRenderingContext2D) {
+    if (this.deathMs > 0) {
+      const frame =
+        Math.floor(this.deathMs / DEATH_FRAME_MS) % 2 === 0
+          ? SPRITE_WRECK_A
+          : SPRITE_WRECK_B;
+      drawSprite(
+        ctx,
+        frame,
+        this.cannonX,
+        CANNON_Y,
+        CANNON_W,
+        CANNON_H,
+        COLORS.explosion,
+      );
+      return;
+    }
     drawSprite(
       ctx,
       SPRITE_CANNON,
