@@ -8,5 +8,5 @@
 | `gloton` | GLOTÓN | ARCADE | yellow | Devora puntos y escapa de los fantasmas. |
 | `invasores` | INVASORES | SHOOTER | green | Defiende el planeta de filas alienígenas. |
 | `asteroids` | ASTEROIDS | SHOOTER | yellow | Pulveriza asteroides en gravedad cero. |
-| `ranaria` | RANARIA | ARCADE | green | Cruza la autopista de pixeles. |
+| `frogger` | FROGGER | ARCADE | green | Cruza la autopista de pixeles. |
 | `duelo-pixel` | DUELO PIXEL | VERSUS | cyan | Dos paletas. Una pelota. Reflejos máximos. |
