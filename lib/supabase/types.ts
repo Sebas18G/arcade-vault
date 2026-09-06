@@ -50,6 +50,17 @@ export type FroggerScoreRow = {
   user_id: string | null;
   created_at: string;
 };
+export type InvasoresScoreRow = {
+  id: string;
+  player_name: string;
+  score: number;
+  level: number;
+  aliens_killed: number;
+  ufos_hit: number;
+  shots_fired: number;
+  user_id: string | null;
+  created_at: string;
+};
 export type GlobalScoreRow = {
   id: string;
   game_id: string;

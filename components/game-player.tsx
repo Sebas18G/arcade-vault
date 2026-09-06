@@ -51,6 +51,10 @@ import {
   getFroggerSkin,
   setFroggerSkin,
 } from "@/components/games/frogger/leaderboard";
+import {
+  addInvasoresScore,
+  getInvasoresLeaderboard,
+} from "@/components/games/invasores/leaderboard";
 const LIVES = 3;
 const TETRIS_SKINS: { value: TetrisSkin; label: string }[] = [
   { value: "retro", label: "Retro" },
@@ -424,10 +428,20 @@ export function GamePlayer({
     setOver(true);
     loadFroggerLeaderboard();
   };
-  // Sin leaderboard: la persistencia de `invasores` es alcance de la spec 15.
+  const loadInvasoresLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardFetchError(null);
+    getInvasoresLeaderboard()
+      .then(setLeaderboardEntries)
+      .catch(() =>
+        setLeaderboardFetchError("No se pudieron cargar las puntuaciones."),
+      )
+      .finally(() => setLeaderboardLoading(false));
+  };
   const handleInvasoresGameOver = (result: InvasoresGameOverResult) => {
     setInvasoresResult(result);
     setOver(true);
+    loadInvasoresLeaderboard();
   };
   const handleForceEnd = () => {
     if (isAsteroids) {
@@ -468,6 +482,7 @@ export function GamePlayer({
         ufosHit: 0,
         shotsFired: 0,
       });
+      loadInvasoresLeaderboard();
     }
     setOver(true);
   };
@@ -736,7 +751,27 @@ export function GamePlayer({
                             setLeaderboardEntries(entries);
                           },
                         }
-                      : undefined
+                      : isInvasores
+                        ? {
+                            entries: leaderboardEntries,
+                            loading: leaderboardLoading,
+                            fetchError: leaderboardFetchError,
+                            onSaveName: async (name) => {
+                              const result = invasoresResult ?? {
+                                score,
+                                level: engineLevel,
+                                aliensKilled: 0,
+                                ufosHit: 0,
+                                shotsFired: 0,
+                              };
+                              const entries = await addInvasoresScore(
+                                name,
+                                result,
+                              );
+                              setLeaderboardEntries(entries);
+                            },
+                          }
+                        : undefined
           }
           onRestart={restart}
         />

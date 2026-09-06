@@ -1,6 +1,6 @@
 # SPEC 15 — Leaderboard propio de Invasores en Supabase
 
-> **Status:** Draft
+> **Status:** Aprobado
 > **Depends on:** SPEC 04, SPEC 06, SPEC 12, SPEC 13, SPEC 14
 > **Date:** 2026-09-05
 > **Objective:** Dar a Invasores su propia tabla de puntajes en Supabase (`invasores_scores`), conectada al modal de fin de partida, a la tarjeta de la biblioteca, a la ficha del juego y al Salón de la Fama, con el mismo modelo de seguridad autenticado que dejaron las specs 12 y 13.
